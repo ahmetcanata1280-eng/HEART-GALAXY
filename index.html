@@ -1,0 +1,3456 @@
+
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Eda'm | Kafamı Topladım Geldim</title>
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+    <!-- FIREBASE SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-deep: #050509;
+            --surface: rgba(12, 13, 21, 0.72);
+            --surface-strong: rgba(15, 16, 26, 0.94);
+            --surface-hover: rgba(255, 255, 255, 0.08);
+            --border-subtle: rgba(255, 255, 255, 0.09);
+            --border-focus: rgba(229, 152, 155, 0.42);
+            --accent-warm: #e5989b;
+            --accent-soft: #ebd8c8;
+            --text-main: #f4f3f6;
+            --text-muted: rgba(244, 243, 246, 0.62);
+            --text-faint: rgba(244, 243, 246, 0.38);
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-deep);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+            touch-action: none;
+        }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 999px; }
+
+        #canvas-container {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            cursor: grab;
+        }
+        #canvas-container:active { cursor: grabbing; }
+
+        /* 3D DÜNYA ÜZERİNDEKİ HAFİF GEZEGEN ETİKETLERİ */
+        #world-labels-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 6;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .planet-float-label {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform: translate(-50%, -100%);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(10, 11, 18, 0.56);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: rgba(244, 243, 246, 0.85);
+            font-size: 0.7rem;
+            font-weight: 500;
+            white-space: nowrap;
+            pointer-events: auto;
+            cursor: pointer;
+            transition: opacity 0.2s ease, border-color 0.2s ease;
+        }
+
+        .planet-float-label:hover {
+            border-color: rgba(229, 152, 155, 0.55);
+            background: rgba(16, 17, 28, 0.85);
+        }
+
+        .planet-float-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .planet-float-dist {
+            color: var(--text-faint);
+            font-size: 0.65rem;
+        }
+
+        /* GİRİŞ EKRANI */
+        #intro-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 400;
+            background: radial-gradient(circle at 50% 42%, #131422 0%, #050509 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+            transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.9s ease;
+        }
+
+        #intro-screen.fade-out {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .intro-badge {
+            font-family: 'Lora', serif;
+            font-style: italic;
+            font-size: 0.9rem;
+            color: var(--accent-warm);
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+
+        .intro-title {
+            font-family: 'Lora', serif;
+            font-weight: 500;
+            font-size: clamp(2.4rem, 6vw, 3.8rem);
+            color: var(--text-main);
+            margin: 0 0 1.3rem 0;
+            letter-spacing: -0.02em;
+        }
+
+        .intro-sub {
+            font-family: 'Lora', serif;
+            font-style: italic;
+            font-size: clamp(1rem, 2.6vw, 1.18rem);
+            color: var(--text-muted);
+            max-width: 540px;
+            line-height: 1.8;
+            margin-bottom: 2.4rem;
+        }
+
+        .start-btn {
+            background: rgba(229, 152, 155, 0.15);
+            border: 1px solid rgba(229, 152, 155, 0.42);
+            color: var(--text-main);
+            padding: 0.95rem 2.3rem;
+            border-radius: 999px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+        }
+
+        .start-btn:hover {
+            transform: translateY(-2px);
+            background: rgba(229, 152, 155, 0.26);
+            border-color: var(--accent-warm);
+        }
+
+        /* ANA ARAYÜZ KATMANI */
+        .ui-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 16px 20px;
+        }
+
+        /* ÜST BAR */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            pointer-events: none;
+        }
+
+        .top-left-group {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand-cluster {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            background: var(--surface);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--border-subtle);
+            padding: 7px 14px;
+            border-radius: 999px;
+        }
+
+        .brand-title {
+            font-family: 'Lora', serif;
+            font-weight: 500;
+            font-size: 1.02rem;
+            margin: 0;
+            cursor: pointer;
+            color: var(--text-main);
+        }
+
+        .fb-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #f59e0b;
+            display: inline-block;
+            transition: all 0.35s ease;
+        }
+
+        .fb-dot.online {
+            background: #34d399;
+            box-shadow: 0 0 8px rgba(52, 211, 153, 0.7);
+        }
+
+        .fb-dot.error {
+            background: #f87171;
+            box-shadow: 0 0 8px rgba(248, 113, 113, 0.7);
+        }
+
+        /* MOD DEĞİŞTİRİCİ (UÇUŞ / SERBEST BAKIŞ) */
+        .mode-switch {
+            display: flex;
+            align-items: center;
+            background: var(--surface);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 999px;
+            padding: 3px;
+            gap: 2px;
+        }
+
+        .mode-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .mode-btn.active {
+            background: rgba(229, 152, 155, 0.2);
+            color: var(--text-main);
+            box-shadow: inset 0 0 0 1px rgba(229, 152, 155, 0.35);
+        }
+
+        /* ORTA KEŞİF SAYAÇLARI */
+        .stats-capsule {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            background: var(--surface);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 999px;
+            padding: 3px 6px;
+            gap: 2px;
+        }
+
+        .stat-chip {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 11px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+            white-space: nowrap;
+        }
+
+        .stat-chip:hover {
+            background: var(--surface-hover);
+            color: var(--text-main);
+        }
+
+        .stat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+        .stat-chip.rose .stat-dot { background: #e5989b; }
+        .stat-chip.gold .stat-dot { background: #ebd8c8; }
+        .stat-chip.cyan .stat-dot { background: #9db4c0; }
+        .stat-val { color: var(--text-main); font-weight: 500; }
+
+        /* SAĞ HIZLI EYLEMLER */
+        .top-actions {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .action-pill {
+            background: var(--surface);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            padding: 7px 13px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+            white-space: nowrap;
+        }
+
+        .action-pill:hover {
+            background: var(--surface-hover);
+            color: var(--text-main);
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+
+        .action-pill.highlight {
+            background: rgba(229, 152, 155, 0.14);
+            border-color: rgba(229, 152, 155, 0.34);
+            color: #f7dcdf;
+        }
+
+        /* NAVİGASYON REHBERİ PİLLİ (Üst-Orta Altında) */
+        #nav-guide-pill {
+            position: fixed;
+            top: 66px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 25;
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 999px;
+            padding: 5px 8px 5px 14px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.75rem;
+            color: var(--text-main);
+            box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+            pointer-events: auto;
+        }
+
+        #nav-guide-arrow {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            color: var(--accent-warm);
+            transition: transform 0.1s linear;
+        }
+
+        .nav-guide-btn {
+            background: rgba(229, 152, 155, 0.18);
+            border: 1px solid rgba(229, 152, 155, 0.35);
+            color: var(--text-main);
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 0.71rem;
+            cursor: pointer;
+        }
+
+        .nav-guide-close {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+
+        /* BİLDİRİM TOAST */
+        #wish-toast {
+            position: fixed;
+            top: 108px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-10px);
+            z-index: 120;
+            background: var(--surface-strong);
+            backdrop-filter: blur(18px);
+            border: 1px solid var(--border-focus);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+            color: var(--text-main);
+            padding: 10px 22px;
+            border-radius: 999px;
+            font-family: 'Lora', serif;
+            font-size: 0.92rem;
+            font-style: italic;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+            text-align: center;
+            max-width: 90vw;
+        }
+
+        #wish-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ALT KONTROL ALANI */
+        .bottom-cockpit {
+            display: grid;
+            grid-template-columns: 165px 1fr 165px;
+            align-items: end;
+            gap: 14px;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            pointer-events: none;
+        }
+
+        .bottom-cockpit.explore-only {
+            grid-template-columns: 1fr;
+        }
+
+        .bottom-cockpit.explore-only .flight-pad-left,
+        .bottom-cockpit.explore-only .flight-pad-right {
+            display: none;
+        }
+
+        /* SOL: MOBİL OYUN TARZI YÖNLENDİRME JOYSTİCKİ */
+        .flight-pad-left {
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .joystick-zone {
+            width: 112px;
+            height: 112px;
+            border-radius: 50%;
+            background: rgba(12, 13, 21, 0.52);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .joystick-zone.active {
+            border-color: rgba(229, 152, 155, 0.45);
+            background: rgba(16, 18, 28, 0.72);
+        }
+
+        .joystick-ring {
+            position: absolute;
+            inset: 18px;
+            border-radius: 50%;
+            border: 1px dashed rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+        }
+
+        .joystick-knob {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #ffffff, #e5989b);
+            border: 1.5px solid rgba(255, 255, 255, 0.65);
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+            position: absolute;
+            transform: translate(0px, 0px);
+            pointer-events: none;
+        }
+
+        .pad-caption {
+            font-size: 0.68rem;
+            color: var(--text-faint);
+            padding-left: 4px;
+        }
+
+        /* ORTA: ANA DOCK */
+        .center-dock-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 9px;
+            pointer-events: none;
+        }
+
+        #proximity-prompt {
+            pointer-events: auto;
+            background: var(--surface-strong);
+            backdrop-filter: blur(18px);
+            border: 1px solid var(--border-focus);
+            color: var(--text-main);
+            padding: 7px 16px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .prox-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-warm);
+            box-shadow: 0 0 8px var(--accent-warm);
+        }
+
+        #orbit-hud {
+            pointer-events: auto;
+            background: var(--surface-strong);
+            border: 1px solid var(--border-subtle);
+            backdrop-filter: blur(18px);
+            padding: 5px 7px 5px 14px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            color: var(--accent-soft);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+        }
+
+        #orbit-hud.hidden { display: none; }
+
+        .hud-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            border-radius: 999px;
+            padding: 5px 11px;
+            font-size: 0.72rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .hud-btn:hover { background: rgba(255, 255, 255, 0.15); }
+
+        #shapes-popover {
+            pointer-events: auto;
+            background: var(--surface-strong);
+            backdrop-filter: blur(22px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 4px;
+            box-shadow: 0 18px 44px rgba(0, 0, 0, 0.65);
+        }
+
+        #shapes-popover.hidden { display: none; }
+
+        .shape-opt-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .shape-opt-btn:hover, .shape-opt-btn.active {
+            background: rgba(229, 152, 155, 0.16);
+            border-color: rgba(229, 152, 155, 0.35);
+            color: var(--text-main);
+        }
+
+        .main-dock {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-subtle);
+            padding: 5px;
+            border-radius: 999px;
+            box-shadow: 0 16px 44px rgba(0, 0, 0, 0.65);
+        }
+
+        .dock-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            padding: 8px 13px;
+            border-radius: 999px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.76rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .dock-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .dock-btn.special-btn {
+            background: rgba(229, 152, 155, 0.15);
+            border-color: rgba(229, 152, 155, 0.34);
+            color: #fae2e4;
+        }
+
+        /* SAĞ: HIZ KONTROLÜ (KAYDIRILABİLİR GAZ KOLU + HIZ TUŞLARI) */
+        .flight-pad-right {
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
+
+        .throttle-box {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(12, 13, 21, 0.58);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 18px;
+            padding: 9px 10px;
+        }
+
+        .throttle-presets {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .speed-preset-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-muted);
+            border-radius: 8px;
+            padding: 6px 9px;
+            font-size: 0.69rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+            min-width: 52px;
+        }
+
+        .speed-preset-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.09);
+        }
+
+        .speed-preset-btn.active {
+            background: rgba(229, 152, 155, 0.22);
+            border-color: rgba(229, 152, 155, 0.45);
+            color: #fae2e4;
+        }
+
+        .throttle-track {
+            width: 34px;
+            height: 118px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            touch-action: none;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .throttle-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 0%;
+            background: linear-gradient(to top, rgba(229, 152, 155, 0.28), rgba(229, 152, 155, 0.65));
+            pointer-events: none;
+            transition: height 0.06s linear;
+        }
+
+        .throttle-thumb {
+            position: absolute;
+            left: 3px;
+            right: 3px;
+            height: 24px;
+            bottom: 2px;
+            border-radius: 999px;
+            background: #f4f3f6;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .throttle-thumb::after {
+            content: '';
+            width: 12px;
+            height: 2px;
+            background: #6b4e53;
+            border-radius: 2px;
+        }
+
+        /* GEZEGEN PANELİ */
+        #planet-drawer {
+            position: fixed;
+            right: 18px;
+            top: 50%;
+            transform: translateY(-50%) translateX(130%);
+            z-index: 80;
+            background: var(--surface-strong);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--border-subtle);
+            border-radius: 20px;
+            padding: 16px;
+            width: 285px;
+            max-height: 76vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+            transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: auto;
+        }
+
+        #planet-drawer.open { transform: translateY(-50%) translateX(0); }
+
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .drawer-title { font-family: 'Lora', serif; font-size: 0.96rem; font-weight: 500; }
+
+        .drawer-close {
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            color: var(--text-muted);
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .planet-list { display: flex; flex-direction: column; gap: 6px; }
+
+        .planet-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .planet-nav-btn {
+            flex: 1;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            padding: 8px 10px;
+            color: var(--text-muted);
+            font-size: 0.77rem;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            transition: all 0.2s ease;
+        }
+
+        .planet-nav-btn:hover, .planet-nav-btn.active {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: var(--border-subtle);
+            color: var(--text-main);
+        }
+
+        .planet-guide-mini {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 0.68rem;
+            cursor: pointer;
+        }
+
+        .planet-guide-mini:hover {
+            color: var(--text-main);
+            border-color: var(--border-focus);
+        }
+
+        .planet-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+        /* MODALLAR */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(4, 5, 10, 0.74);
+            backdrop-filter: blur(12px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            opacity: 1;
+            transition: opacity 0.26s ease;
+            pointer-events: auto;
+            padding: 1.2rem;
+        }
+
+        .modal-overlay.hidden { opacity: 0; pointer-events: none; }
+
+        .glass-card {
+            background: var(--surface-strong);
+            border: 1px solid var(--border-subtle);
+            box-shadow: 0 28px 70px rgba(0, 0, 0, 0.85);
+            border-radius: 22px;
+            padding: 2.1rem 1.9rem;
+            max-width: 530px;
+            width: 100%;
+            text-align: center;
+            position: relative;
+            max-height: 88vh;
+            overflow-y: auto;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            color: var(--text-muted);
+            font-size: 1.15rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-icon { font-size: 1.5rem; color: var(--accent-warm); margin-bottom: 0.45rem; }
+        .modal-tag { color: var(--accent-warm); font-size: 0.73rem; font-weight: 500; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 0.75rem; }
+        .modal-title-heading { font-family: 'Lora', serif; font-weight: 500; margin: 0 0 1rem 0; font-size: 1.42rem; }
+        .modal-text { font-family: 'Lora', serif; font-size: 1.12rem; line-height: 1.78; margin: 0 0 1.5rem 0; }
+
+        .planet-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.3rem; text-align: left; }
+        .planet-meta-box { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); padding: 10px 13px; border-radius: 12px; }
+        .planet-meta-label { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px; }
+        .planet-meta-val { font-size: 0.82rem; font-weight: 500; }
+
+        .modal-btn-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        .modal-sub-btn {
+            background: rgba(255, 255, 255, 0.09);
+            border: 1px solid var(--border-focus);
+            color: var(--text-main);
+            padding: 9px 18px;
+            border-radius: 999px;
+            font-size: 0.81rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .modal-sub-btn.secondary { background: transparent; border-color: var(--border-subtle); color: var(--text-muted); }
+
+        .letter-text {
+            font-family: 'Lora', serif;
+            font-size: 1.04rem;
+            line-height: 1.8;
+            text-align: left;
+            margin-bottom: 1.6rem;
+            border-left: 2px solid rgba(229, 152, 155, 0.5);
+            padding-left: 1.1rem;
+            color: rgba(244, 243, 246, 0.92);
+        }
+
+        .forgive-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        .btn-forgive {
+            background: var(--text-main);
+            border: 1px solid var(--text-main);
+            color: #0b0b12;
+            padding: 11px 24px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 0.84rem;
+            cursor: pointer;
+        }
+        .btn-coy {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            padding: 11px 18px;
+            border-radius: 999px;
+            font-size: 0.81rem;
+            cursor: pointer;
+        }
+
+        .fb-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.73rem;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            padding: 4px 12px;
+            border-radius: 999px;
+            margin-bottom: 14px;
+        }
+
+        .note-form-group { text-align: left; margin-bottom: 14px; }
+        .note-input, .note-select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 11px 14px;
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.86rem;
+            margin-bottom: 10px;
+            outline: none;
+            user-select: text;
+        }
+        .note-select option { background: #141520; color: var(--text-main); }
+        .note-input:focus, .note-select:focus { border-color: var(--accent-warm); }
+
+        .notes-feed {
+            margin-top: 16px;
+            text-align: left;
+            max-height: 220px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 4px;
+        }
+
+        .note-item-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-subtle);
+            border-left: 2px solid var(--accent-warm);
+            border-radius: 11px;
+            padding: 10px 13px;
+            font-size: 0.84rem;
+            line-height: 1.55;
+        }
+
+        .note-item-meta { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--accent-soft); margin-bottom: 4px; }
+        .log-item { font-size: 0.74rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); padding: 9px 11px; border-radius: 10px; text-align: left; margin-bottom: 6px; }
+
+        .svg-icon {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex-shrink: 0;
+        }
+
+        /* MOBİL UYUMLULUK */
+        @media (max-width: 920px) {
+            .ui-layer { padding: 10px 12px; }
+            .top-bar { flex-wrap: wrap; gap: 7px; }
+            .stats-capsule { order: 3; width: 100%; justify-content: center; }
+            .bottom-cockpit { grid-template-columns: 102px 1fr 112px; gap: 6px; }
+            .joystick-zone { width: 92px; height: 92px; }
+            .joystick-knob { width: 34px; height: 34px; }
+            .throttle-box { padding: 7px; gap: 6px; }
+            .throttle-track { width: 28px; height: 100px; }
+            .speed-preset-btn { min-width: 44px; padding: 5px 6px; font-size: 0.65rem; }
+            .main-dock { flex-wrap: wrap; justify-content: center; border-radius: 18px; padding: 4px; gap: 3px; }
+            .dock-btn { padding: 6px 9px; font-size: 0.7rem; }
+            .pad-caption { display: none; }
+            .action-pill span.hide-sm { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- GİRİŞ EKRANI -->
+    <div id="intro-screen">
+        <div class="intro-badge">Herşeyim, Biricik Gülüm'e...</div>
+        <h1 class="intro-title">Eda'm</h1>
+        <p class="intro-sub">
+            "Gülüşüm bu sana seninle aramızda geçen herhangi bir olayda sacma sapan tepkiler verdigim icin son özrüm son sacmaligim son sacmalayisim hersey icin ozur dilerim nolursun beni affet seni cok seviyorum"
+        </p>
+        <button id="start-btn" class="start-btn">
+            <span>Uzay Gemisine Bin & Başla</span>
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+    </div>
+
+    <!-- 3D GEZEGEN ETİKETLERİ KATMANI -->
+    <div id="world-labels-layer"></div>
+
+    <!-- YÖN REHBERİ -->
+    <div id="nav-guide-pill">
+        <span id="nav-guide-arrow">
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="m12 3 7 16-7-4-7 4Z"/></svg>
+        </span>
+        <span id="nav-guide-text">Hedef</span>
+        <button id="nav-guide-warp" class="nav-guide-btn">Otopilot</button>
+        <button id="nav-guide-close" class="nav-guide-close">&times;</button>
+    </div>
+
+    <!-- DİLEK & BİLDİRİM TOAST -->
+    <div id="wish-toast">Tek dileğim: Bugünkü saçmalığımı unutup yine eskisi gibi gülmen ✨</div>
+
+    <!-- GEZEGEN KEŞİF & IŞINLANMA ÇEKMECESİ -->
+    <aside id="planet-drawer">
+        <div class="drawer-header">
+            <span class="drawer-title">Seyir & Gezegen Haritası</span>
+            <button id="close-drawer" class="drawer-close">&times;</button>
+        </div>
+        <div class="planet-list" id="planet-nav-list"></div>
+    </aside>
+
+    <!-- 3D SAHNE -->
+    <div id="canvas-container"></div>
+
+    <!-- ARAYÜZ -->
+    <div class="ui-layer">
+        <!-- ÜST BAR -->
+        <header class="top-bar">
+            <div class="top-left-group">
+                <div class="brand-cluster">
+                    <h1 id="secret-log-trigger" class="brand-title" title="Eda'm Evreni">Eda'm</h1>
+                    <span id="fb-status-dot" class="fb-dot" title="Firebase Bağlanıyor..."></span>
+                </div>
+
+                <!-- UÇUŞ / SERBEST BAKIŞ ANAHTARI -->
+                <div class="mode-switch" title="Görünüm Modunu Değiştir">
+                    <button id="btn-mode-flight" class="mode-btn active">Uçuş Modu</button>
+                    <button id="btn-mode-explore" class="mode-btn">Serbest Bakış</button>
+                </div>
+            </div>
+
+            <!-- ORTA KEŞİF SAYAÇLARI -->
+            <div class="stats-capsule">
+                <button id="crystal-counter" class="stat-chip rose" title="Sıradaki Pembe Taşı Aç">
+                    <span class="stat-dot"></span>
+                    <span>Taş</span>
+                    <span id="crystal-counter-text" class="stat-val">0/7</span>
+                </button>
+                <button id="star-counter" class="stat-chip gold" title="Rastgele Yıldız Notu Aç">
+                    <span class="stat-dot"></span>
+                    <span>Yıldız</span>
+                    <span id="counter-text" class="stat-val">0/100</span>
+                </button>
+                <button id="planet-counter" class="stat-chip cyan" title="Gezegen Haritasını Aç">
+                    <span class="stat-dot"></span>
+                    <span>Gezegen</span>
+                    <span id="planet-counter-text" class="stat-val">0/7</span>
+                </button>
+            </div>
+
+            <!-- SAĞ HIZLI EYLEMLER -->
+            <div class="top-actions">
+                <button id="top-note-btn" class="action-pill highlight">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    <span>Not Bırak</span>
+                </button>
+                <button id="wish-btn" class="action-pill">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="m12 3 1.9 5.8L20 10l-5.2 3.3L16 19l-4-3.1L8 19l1.2-5.7L4 10l6.1-1.2Z"/></svg>
+                    <span class="hide-sm">Dilek</span>
+                </button>
+                <button id="music-toggle" class="action-pill">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    <span id="music-label" class="hide-sm">Müzik</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ALT KONTROL ALANI -->
+        <div id="bottom-cockpit" class="bottom-cockpit">
+            <!-- SOL: YÖN KUMANDASI -->
+            <div class="flight-pad-left">
+                <div id="joystick-zone" class="joystick-zone" title="Gemiyi Yönlendir">
+                    <div class="joystick-ring"></div>
+                    <div id="joystick-knob" class="joystick-knob"></div>
+                </div>
+                <span class="pad-caption">Yönlendir • Sürükle veya WASD</span>
+            </div>
+
+            <!-- ORTA: KOMPAKT DOCK -->
+            <div class="center-dock-area">
+                <button id="proximity-prompt">
+                    <span class="prox-dot"></span>
+                    <span id="proximity-prompt-text">Hedefi İncele</span>
+                </button>
+
+                <div id="orbit-hud" class="hidden">
+                    <span id="orbit-hud-label">Gözlerinin Hükümdarlığı</span>
+                    <button id="hud-info-btn" class="hud-btn">Notu Oku</button>
+                    <button id="hud-return-btn" class="hud-btn">Merkeze Dön</button>
+                </div>
+
+                <div id="shapes-popover" class="hidden">
+                    <button class="shape-opt-btn active" data-shape="heart">Kalp</button>
+                    <button class="shape-opt-btn" data-shape="infinity">Sonsuzluk</button>
+                    <button class="shape-opt-btn" data-shape="rose">Gül</button>
+                    <button class="shape-opt-btn" data-shape="galaxy">Galaksi</button>
+                    <button class="shape-opt-btn" data-shape="saturn">Satürn</button>
+                    <button class="shape-opt-btn" data-shape="dna">İkimiz</button>
+                </div>
+
+                <nav class="main-dock">
+                    <button id="toggle-shapes-btn" class="dock-btn">Şekiller</button>
+                    <button id="open-planets-btn" class="dock-btn">Gezegenler</button>
+                    <button id="random-star-btn" class="dock-btn">Rastgele Yıldız</button>
+                    <button id="open-notes-dock-btn" class="dock-btn">Notlar</button>
+                    <button id="open-letter-btn" class="dock-btn special-btn">Mektubum</button>
+                </nav>
+            </div>
+
+            <!-- SAĞ: HIZ KADEMESİ VE GAZ KOLU -->
+            <div class="flight-pad-right">
+                <div class="throttle-box">
+                    <div class="throttle-presets">
+                        <button class="speed-preset-btn" data-speed="0.9">Hızlı</button>
+                        <button class="speed-preset-btn" data-speed="0.45">Seyir</button>
+                        <button class="speed-preset-btn active" data-speed="0">Dur</button>
+                    </div>
+                    <div id="throttle-track" class="throttle-track" title="Yukarı / Aşağı Kaydırarak Hızı Ayarla">
+                        <div id="throttle-fill" class="throttle-fill"></div>
+                        <div id="throttle-thumb" class="throttle-thumb"></div>
+                    </div>
+                </div>
+                <span class="pad-caption" id="speed-readout-caption">Hız: Duruyor</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. YILDIZ & PEMBE TAŞ MODALI -->
+    <div id="reason-modal" class="modal-overlay hidden">
+        <div class="glass-card">
+            <button id="close-reason" class="close-btn">&times;</button>
+            <div id="modal-icon" class="modal-icon">✦</div>
+            <div id="reason-number" class="modal-tag">Neden #1</div>
+            <p id="reason-text" class="modal-text">Güldüğün zaman gözlerinin içinin bile gülmesi.</p>
+            <div class="modal-btn-row">
+                <button id="next-peace-btn" class="modal-sub-btn secondary">Diğer Pembe Taş</button>
+                <button id="next-reason-btn" class="modal-sub-btn">Başka Bir Yıldız</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. GEZEGEN KEŞİF MODALI -->
+    <div id="planet-modal" class="modal-overlay hidden">
+        <div class="glass-card">
+            <button id="close-planet" class="close-btn">&times;</button>
+            <div id="planet-modal-icon" class="modal-icon">👑</div>
+            <div id="planet-modal-tag" class="modal-tag">İhtişam #1</div>
+            <h2 id="planet-modal-title" class="modal-title-heading">Gözlerinin Hükümdarlığı</h2>
+            <div class="planet-meta-grid">
+                <div class="planet-meta-box">
+                    <span class="planet-meta-label">Detay</span>
+                    <span id="planet-meta-dist" class="planet-meta-val">Tek Bakışta Esaret</span>
+                </div>
+                <div class="planet-meta-box">
+                    <span class="planet-meta-label">His</span>
+                    <span id="planet-meta-atm" class="planet-meta-val">Baş Döndürücü İhtişam</span>
+                </div>
+            </div>
+            <p id="planet-modal-text" class="modal-text"></p>
+            <div class="modal-btn-row">
+                <button id="next-planet-btn" class="modal-sub-btn">Sonraki Gezegen</button>
+                <button id="return-core-btn" class="modal-sub-btn secondary">Merkeze Dön</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. ÖZÜR VE BARIŞMA MEKTUBU MODALI -->
+    <div id="letter-modal" class="modal-overlay hidden">
+        <div class="glass-card">
+            <button id="close-letter" class="close-btn">&times;</button>
+            <div class="modal-icon">♥</div>
+            <div class="modal-tag">Kendime çeki düzen verdim ve yine sana geldim gülüm</div>
+            <div id="letter-body" class="letter-text">
+                Kurban olduğum,<br><br>
+                Bana ne söylersen söyle diyecek tek birşeyim bile yok seni yine bu mesele yüzünden saçma sapan tepkilerim yüzünden hayal kırıklığına uğrattım biliyorum sen benim herşeyimsin seni üzdügüm basitce sadece dusunuldugunu onemsendigini gormek istemene rağmen bunu bu kadar cetrefilli bi hale getirip sana kizdigim seni kirdigim o güzel gözlerinden yaslar süzülmesine sebep oldugum icin ozur dilerim sen benim herseyimsin gercekten ozur dilerim<br><br>
+                Hele sonrasında sen bana benim komusmam icin düzeltmem icin firsat vermisken daha da cok sicip sivamam seni gercekten degersiz hissettirmem tam benim öküzlüğümdü. Seni önemsiz hissettirmek dünyada isteyeceğim son şey bile değil yavrum. Laf olsun diye özür dilemiyorum; sen bana kırgınken gerçekten içim rahat etmiyor. Hadi affet beni, o güzel yüzün gülsün artık.Vallahi billahi kurnan olurum sana biricik gülüm benim
+            </div>
+            <div id="forgive-box" class="forgive-actions">
+                <button id="btn-forgive" class="btn-forgive">Tamam, barıştık 🤍</button>
+                <button id="btn-coy" class="btn-coy">Hâlâ kırgınım</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. KULLANICI NOT BIRAKMA MODALI -->
+    <div id="note-modal" class="modal-overlay hidden">
+        <div class="glass-card">
+            <button id="close-note-modal" class="close-btn">&times;</button>
+            <div class="modal-tag">Uzay Seyir Defteri • Kalp Notları</div>
+            <h2 class="modal-title-heading">Bana Bir Not Bırak Gülüm</h2>
+            <div id="modal-fb-badge" class="fb-status-pill">
+                <span id="modal-fb-dot" class="fb-dot"></span>
+                <span id="modal-fb-text">Firebase'e bağlanılıyor...</span>
+            </div>
+            <div class="note-form-group">
+                <select id="user-note-mood" class="note-select">
+                    <option value="🤍 Barıştık / Gönlüm Oldu">🤍 Barıştık / Gönlüm Oldu</option>
+                    <option value="💌 İçimden Gelen Bir Not">💌 İçimden Gelen Bir Not</option>
+                    <option value="✨ Bir Dileğim Var">✨ Bir Dileğim Var</option>
+                    <option value="🥺 Hâlâ Biraz Kırgınım">🥺 Hâlâ Biraz Kırgınım</option>
+                    <option value="💖 Seni Çok Seviyorum">💖 Seni Çok Seviyorum</option>
+                </select>
+                <textarea id="user-note-input" class="note-input" rows="3" placeholder="İçinden geçenleri buraya yaz kurban olduğum, anında kalbime kaydolacak..."></textarea>
+                <button id="save-user-note-btn" class="btn-forgive" style="width: 100%;">Notu Uzaya Kaydet</button>
+            </div>
+            <div class="notes-feed" id="user-notes-list">
+                <div style="text-align:center; color:var(--text-muted); font-size:0.8rem;">Bağlantı bekleniyor...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. GİZLİ SEYİR LOGLARI MODALI (Başlığa 5 Tık) -->
+    <div id="logs-modal" class="modal-overlay hidden">
+        <div class="glass-card" style="max-width: 620px;">
+            <button id="close-logs-modal" class="close-btn">&times;</button>
+            <div class="modal-tag">Seyir Kayıtları</div>
+            <h2 class="modal-title-heading">Hareket & Eylem Kayıtları</h2>
+            <div id="logs-feed-container" class="notes-feed" style="max-height: 360px;"></div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ============================================================================
+        // 0. FIREBASE BAĞLANTISI (GÜVENLİ & CANLI DURUM TAKİPLİ)
+        // ============================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCE2JNxCn7-FY28P9_e6NGgZPgV9h3W5c4",
+            authDomain: "heartcode-5e52a.firebaseapp.com",
+            databaseURL: "https://heartcode-5e52a-default-rtdb.firebaseio.com",
+            projectId: "heartcode-5e52a",
+            storageBucket: "heartcode-5e52a.firebasestorage.app",
+            messagingSenderId: "985008854685",
+            appId: "1:985008854685:web:c9aa9b39ad9633df56e674",
+            measurementId: "G-LD7J5J6FDH"
+        };
+
+        let database = null;
+        let auth = null;
+        const FB_ROOT = 'edam_uzay_evreni';
+        const sessionId = "sefer_" + Date.now().toString(36);
+
+        const fbStatusDot = document.getElementById('fb-status-dot');
+        const modalFbDot = document.getElementById('modal-fb-dot');
+        const modalFbText = document.getElementById('modal-fb-text');
+
+        let isAuthenticated = false;
+        let isDbConnected = false;
+        let notesListenerStarted = false;
+        const pendingLogs = [];
+
+        function setFirebaseStatus(state, text) {
+            [fbStatusDot, modalFbDot].forEach(dot => {
+                if (!dot) return;
+                dot.classList.remove('online', 'error');
+                if (state === 'online') dot.classList.add('online');
+                if (state === 'error') dot.classList.add('error');
+                dot.title = text;
+            });
+            if (modalFbText) modalFbText.innerText = text;
+        }
+
+        async function initFirebaseConnection() {
+            if (typeof firebase === 'undefined') {
+                setFirebaseStatus('error', 'Firebase SDK yüklenemedi (internet bağlantını kontrol et).');
+                return;
+            }
+
+            try {
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+                database = firebase.database();
+                auth = firebase.auth();
+
+                setFirebaseStatus('connecting', 'Oturum açılıyor...');
+
+                // file:// veya sandbox ortamlarda storage hatası olmaması için güvenli giriş
+                const needsMemoryAuth = window.location.protocol === 'file:' || window.location.origin === 'null';
+                if (needsMemoryAuth) {
+                    try {
+                        await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+                    } catch (_) {}
+                }
+
+                try {
+                    await auth.signInWithEmailAndPassword("bizimanilarimiz@ask.com", "19041904");
+                } catch (authErr) {
+                    // Storage engeli varsa bellek içi (NONE) oturumla tekrar dene
+                    if (authErr && (authErr.code === 'auth/web-storage-unsupported' || authErr.code === 'auth/operation-not-supported-in-this-environment')) {
+                        await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+                        await auth.signInWithEmailAndPassword("bizimanilarimiz@ask.com", "19041904");
+                    } else {
+                        throw authErr;
+                    }
+                }
+
+                isAuthenticated = true;
+                setFirebaseStatus('connecting', 'Veritabanına bağlanılıyor...');
+
+                // Gerçek zamanlı WebSocket bağlantı durumunu izle
+                database.ref('.info/connected').on('value', (snap) => {
+                    isDbConnected = snap.val() === true;
+                    if (isDbConnected && isAuthenticated) {
+                        setFirebaseStatus('online', 'Bağlı • Notlar canlı kaydediliyor');
+                    } else if (isAuthenticated) {
+                        setFirebaseStatus('connecting', 'Veritabanı bağlantısı bekleniyor...');
+                    }
+                });
+
+                // Bekleyen logları gönder
+                while (pendingLogs.length > 0) {
+                    const item = pendingLogs.shift();
+                    database.ref(`${FB_ROOT}/loglar`).push(item).catch(() => {});
+                }
+
+                listenUserNotes();
+                logUserAction("baglanti_kuruldu", "Uygulama açıldı ve Firebase oturumu doğrulandı");
+            } catch (err) {
+                console.error("Firebase bağlantı hatası:", err);
+                const msg = err && err.code ? `Bağlantı hatası (${err.code})` : (err?.message || 'Bağlantı kurulamadı');
+                setFirebaseStatus('error', msg);
+                const notesListEl = document.getElementById('user-notes-list');
+                if (notesListEl) {
+                    notesListEl.innerHTML = `<div style="text-align:center; color:#f87171; font-size:0.8rem;">${escapeHtml(msg)}</div>`;
+                }
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        let currentNearestLabel = "Merkez Kalp";
+
+        function logUserAction(actionType, detailText, extraData = {}) {
+            const pos = camera ? {
+                x: Math.round(camera.position.x),
+                y: Math.round(camera.position.y),
+                z: Math.round(camera.position.z)
+            } : { x: 0, y: 0, z: 0 };
+
+            const payload = {
+                seferId: sessionId,
+                eylem: actionType,
+                detay: detailText,
+                konum: pos,
+                enYakinBirim: currentNearestLabel || "Merkez Kalp",
+                tarih: new Date().toLocaleString('tr-TR'),
+                timestamp: Date.now(),
+                ...extraData
+            };
+
+            if (!isAuthenticated || !database) {
+                if (pendingLogs.length < 25) pendingLogs.push(payload);
+                return;
+            }
+            database.ref(`${FB_ROOT}/loglar`).push(payload).catch(() => {});
+        }
+
+        // ============================================================================
+        // 1. PEMBE TAŞLAR (7 ÖZEL TAŞ)
+        // ============================================================================
+        const peaceReasons = [
+            {
+                title: "Pembe Taş #1 • O Attığın Video",
+                text: "Videoyu açtığım an kıyafetine falan değil doğrudan yüzüne, dudaklarına, gülüşüne ve ne kadar zayıfladığına kilitlendim. Gerçekten afet gibiydin, aklım başımdan gitti."
+            },
+            {
+                title: "Pembe Taş #2 • Tamamen saçmalayışım ve seni kırmam",
+                text: "Yavrum biliyorum ne söylersem söyleyeyim bi hata yaptıktan sonra bi manası yok senin için haklısında seni hic kirmamali uzmemeliydim seni sarip sarmalamam gereken yerde sacma sapan tepkilerim yuzunden senin o güzel gulusunu dusurdum kalbini kirdim vallahi kopek gibi pismanim gercekten ozur dilerim sana bir daha asla boyle gelmeyecegim"
+            },
+            {
+                title: "Pembe Taş #3 • Bu konuda daha önce de defalarca söz vermem ",
+                text: "Biliyorum ilk basta düzgünce toparlamaya calissaydim seni hic kirmasaydim ne vardi kendile cok kiziyorum emin ol kurban oldugum sana bu konuda defalarca soz verdim bi boklar yiyip yiyip sonrasinda ozur dilemek ve karsina gozyaslarini dokup gelmek gercekten benim pismanligim allah sahidim olsun sana bir daha boyle gelmeyecegim"
+            },
+            {
+                title: "Pembe Taş #4 • O 23 Dakikalık Sessizlik",
+                text: "13:55'te 'Bakar mısın bi' yazıp 14:18'e kadar bir şey yazmamam seni önemsemediğimden değildi yavrum. Ne yazsam da durumu toparlasam diye düşünüp kitlendim ama seni umursamamışım gibi görünmekte yerden göğe kadar haklısın."
+            },
+            {
+                title: "Pembe Taş #5 • 10 Üzerinden 1 Milyar",
+                text: "Sen makyajına 10 üzerinden 9 verip 'Giyinip kapanınca 5'e düşer' dedin ya; vallahi benim gözümde her halinle 10 üzerinden 1 milyarsın. O eşit değil dediğin eyelinerın da, allığın da sana çok yakışmıştı."
+            },
+            {
+                title: "Pembe Taş #6 • Kuru Özür Meselesi",
+                text: "Haklısın, üst üste sadece 'Özür dilerim, söz toparlayacağım' yazmak hiçbir işe yaramıyor. Laf olsun diye değil, seni gerçekten ne kadar önemsediğimi gör diye uğraşıyorum."
+            },
+            {
+                title: "Pembe Taş #7 • Kafamı Topladım Geldim",
+                text: "Senin degerin benim icin herseyden ama herseyden cok cok daha fazla o benim yuzunden akan gozyaslarin benim icin iliskimiz icin cektigin o iki bucuk yil cektigin acilar ve cok cok daha fazlasi seni kirdigim icin gercekten ozur dilerim kurban oldugum affet demeye yuzum kalmadi biliyorum ama gercekten ozur dilerim seni birdaha uzmeyecegim"
+            }
+        ];
+
+        // ============================================================================
+        // 2. SENİ SEVMEMİN 100 NEDENİ
+        // ============================================================================
+        const reasons = [
+            "Güldüğün zaman gözlerinin içinin bile gülmesi.",
+            "En saçma konular hakkında bile saatlerce sıkılmadan konuşabilmemiz.",
+            "Sesini duyduğum anda bütün yorgunluğumun bir anda geçmesi.",
+            "Bana kızgınken bile beni merak etmekten kendini alamaman.",
+            "Yanındayken zamanın nasıl geçtiğini hiç anlamamam.",
+            "Kimseye anlatamadığım şeyleri sana hiç düşünmeden anlatabilmem.",
+            "Bazen tek bir bakışımla bile ne demek istediğimi hemen anlaman.",
+            "Uykulu halinle konuşurken sesinin dünyanın en tatlı şeyine dönüşmesi.",
+            "İnatlaştığın zamanlarda bile o tatlı tavrını kaybetmemen.",
+            "Hayatıma girdiğin günden beri her şeyin çok daha anlamlı olması.",
+            "Birlikte susup otursak bile yanından hiç ayrılmak istememem.",
+            "Bana her koşulda güvendiğini ve arkamda durduğunu hissettirmen.",
+            "En gergin olduğum anlarda bile beni tek bir cümlenle sakinleştirebilmen.",
+            "Küçük şeylerden bile kocaman mutluluklar çıkarabilmen.",
+            "Seninle geleceğe dair hayal kurmanın verdiği o güzel heyecan.",
+            "Beni değiştirmeye çalışmadan, olduğum gibi kabul edip sevmen.",
+            "Sabah uyanır uyanmaz aklıma gelen ilk kişi olman.",
+            "Gece uyumadan önce sesini duymadan rahat edememem.",
+            "Bazen çocuk gibi şımarıp, bazen en olgun sırdaşım olabilmen.",
+            "Yüzündeki o masum ifadeye her baktığımda yeniden aşık olmam.",
+            "Aramızda mesafeler olsa bile varlığını hep yanı başımda hissettirmen.",
+            "Anlattığım en sıkıcı şeyleri bile ilgiyle dinlemen.",
+            "Seninle geçirdiğim en sıradan günün bile özel bir anıya dönüşmesi.",
+            "Ellerini tuttuğumda dünyadaki en doğru yerde olduğumu bilmem.",
+            "Bana daha önce hiç tatmadığım kadar güzel bir sevgi yaşatman.",
+            "Heyecanlandığında hızlı hızlı ve tatlı tatlı anlatman.",
+            "Benim bile kendimde fark etmediğim ufak detayları hatırlaman.",
+            "Sana sarıldığımda dışarıdaki bütün dertleri kapının dışında bırakabilmem.",
+            "Göz göze geldiğimizde istemsizce yüzümde oluşan o gülümseme.",
+            "Kötü bir gün geçirdiğimde sığınmak istediğim tek yerin senin yanın olması.",
+            "Trip atarken bile aslında sadece biraz ilgi istediğini bilmem.",
+            "Kalbinin ne kadar temiz ve merhametli olduğunu her fırsatta görmem.",
+            "Aynı anda aynı şeyi düşünüp birbirimize şaşırarak bakmamız.",
+            "İçtenliğin, doğallığın ve hiçbir zaman yapmacık olmaman.",
+            "Sadece ikimizin anladığı o küçük şakalarımız.",
+            "Birlikte kurduğumuz bu düzenin bana verdiği huzur.",
+            "Benim mutluluğumla benden daha çok sevinebilmen.",
+            "Üzgün olduğumu sesimin tonundan bile saniyesinde anlaman.",
+            "Senin yanında kendimi hiç olmadığım kadar güçlü hissetmem.",
+            "Kokunun bana hep huzuru ve evi hatırlatması.",
+            "Bana kızdığında bile kıyamayıp hemen yumuşaman.",
+            "Hayat planlarımın hepsinde başrolde senin olman.",
+            "Güzel bir şey gördüğümde ya da duyduğumda ilk sana anlatmak istemem.",
+            "Sevgini sadece sözlerinle değil, davranışlarınla da belli etmen.",
+            "Yanımda olduğunda başka hiçbir şeye ihtiyaç duymamam.",
+            "Beni her zaman daha iyi biri olmaya teşvik etmen.",
+            "Telefon ekranında adını gördüğüm her seferinde içimin kıpır kıpır olması.",
+            "Birlikte müzik dinlerken ya da bir şey izlerken aldığım keyif.",
+            "Zor zamanlarımda elimi bir an olsun bırakmaman.",
+            "Gözlerindeki o samimiyetin bana her zaman güven vermesi.",
+            "Bazen sadece sesini duymanın bile başımın ağrısını geçirmesi.",
+            "Benimle uğraşmayı ve beni tatlı tatlı kızdırmayı sevmen.",
+            "Seninle tartışmanın bile başkasıyla iyi anlaşmaktan daha güzel olması.",
+            "Kıskandığın zamanlarda büründüğün o aşırı tatlı hallerin.",
+            "Verdiğin sözlerin arkasında her zaman durman.",
+            "Sana her baktığımda 'iyi ki' demekten kendimi alamamam.",
+            "Hayatın bütün koşturmacası içinde benim tek nefes alma noktam olman.",
+            "Bana sevildiğimi iliklerime kadar hissettirmen.",
+            "Beraber yürüdüğümüz yolların hiç bitmemesini istemem.",
+            "Seninle geçen ayların, yılların göz açıp kapayıncaya kadar akıp gitmesi.",
+            "En ufak bir düşüncesizliğimde bile alttan almayı bilmen.",
+            "Gülüşünün sesini dünyadaki bütün şarkılara değişmemem.",
+            "Beni herkesten daha iyi tanıman ve anlaman.",
+            "Seninle konuşurken saatlerin nasıl geçtiğini unutacak kadar dalıp gitmem.",
+            "Bana baktığında gözlerinde gördüğüm o sevgi.",
+            "Kafam çok karışık olduğunda bile beni toparlayabilmen.",
+            "Senin yanındayken hiçbir maske takmak zorunda kalmamam.",
+            "Paylaştığımız her anının hafızamda en güzel köşede durması.",
+            "Bir şeye sevindiğinde gözlerinde oluşan o parlaklık.",
+            "Sadece sevgilim değil, aynı zamanda en yakın arkadaşım olman.",
+            "Bana olan inancını hiçbir zaman kaybetmemen.",
+            "Uzakta olsan bile varlığınla içimi ısıtman.",
+            "Seninle her yeni güne başlamanın verdiği mutluluk.",
+            "Aramızdaki bağın her geçen gün daha da sağlamlaşması.",
+            "Bazen hiçbir şey söylemeden de anlaşabilmemiz.",
+            "Naz yapmanın bile sana bu kadar çok yakışması.",
+            "Beni merak etmen, düşünmen ve bunu hep hissettirmen.",
+            "Seninle paylaştığım her sırrın güvende olduğunu bilmem.",
+            "Birlikte güldüğümüz anlarda dünyadaki her şeyi unutmam.",
+            "Bana kattığın tüm güzellikler ve öğrettiğin duygular.",
+            "Yorgun argın geçen bir günün sonunda benim ödülüm olman.",
+            "Seninle her şeyin çok daha kolay ve çekilebilir gelmesi.",
+            "Yüzün düştüğünde bile güzelliğinden hiçbir şey kaybetmemen.",
+            "Sana olan sevgimin ilk günkünden bile daha fazla olması.",
+            "Benim huysuzluklarıma bile sabırla yaklaşman.",
+            "Birlikte yemek yemekten, bir şeyler içmekten bile ayrı bir tat almam.",
+            "Aklıma her geldiğinde yüzümde istemsiz bir tebessüm bırakman.",
+            "Hayatımda verdiğim en doğru kararın sen olman.",
+            "Seninle kurduğumuz bu güzel dünyayı hiçbir şeye değişmemem.",
+            "Bana kendimi özel ve değerli hissettirmen.",
+            "Her zorluğun üstesinden beraber gelebileceğimize olan inancım.",
+            "Şefkatinle içimdeki bütün kırgınlıkları iyileştirmen.",
+            "Seninle yaşlanmak fikrinin bana dünyanın en güzel hayali gibi gelmesi.",
+            "Gözlerime her baktığında kalbimin ilk günkü gibi hızlı çarpması.",
+            "Hayatımdaki tüm eksikleri tek başına tamamlaman.",
+            "Sana sarılmanın verdiği o tarifsiz aidiyet hissi.",
+            "Ne yaşarsak yaşayalım günün sonunda birbirimize kalmamız.",
+            "Varlığınla hayatımı güzelleştirmen.",
+            "Sadece sen olduğun için, her halinle kabulüm olduğun için.",
+            "Seni dün de sevdim, bugün de seviyorum, yarın da hep seveceğim Eda'm."
+        ];
+
+        // ============================================================================
+        // 2.5 GÜZELLİĞİNİN 7 GEZEGENİ
+        // ============================================================================
+        const planetsData = [
+            {
+                id: 1,
+                name: "Gözlerinin Hükümdarlığı",
+                tag: "Gezegen #1 • Kusursuzluğun Başkenti",
+                icon: "👑",
+                distanceLabel: "Tek Bakışta Esaret",
+                atmosphere: "Baş Döndürücü İhtişam",
+                text: "Gözlerin o kadar derin, o kadar büyüleyici ki; içine baktığım ilk saniyede kainatın bütün yıldızları sönüyor. Kirpiklerinin ucundan süzülen tek bir bakışın bile aklımı başımdan almaya, kalbimi yerinden sökmeye yetiyor. Sen yeryüzüne inmiş en muazzam mucizesin.",
+                orbitRadius: 235,
+                size: 16,
+                speed: 0.14,
+                tilt: 0.35,
+                hasRing: true,
+                ringColor: 0xffd700,
+                moons: 1,
+                palette: ["#4cc9f0", "#ff6b9d", "#1d3557", "#ffd166"],
+                dotColor: "#4cc9f0"
+            },
+            {
+                id: 2,
+                name: "Gülüşünün Saltanatı",
+                tag: "Gezegen #2 • Güneşin Kıskandığı Işık",
+                icon: "✨",
+                distanceLabel: "Dudaklarının Kıvrımı",
+                atmosphere: "Saf Cennet Nuru",
+                text: "Dudakların hafifçe kıvrılıp da o eşsiz gülüşün yüzünde çiçek açtığı an, bütün evrenin karanlığı dağılıyor. Sesindeki o melodi, gülüşündeki o baş döndürücü zarafet karşısında nefesim kesiliyor; dünyanın yedi harikası senin tek bir tebessümünün yanında sönük kalır.",
+                orbitRadius: 345,
+                size: 14,
+                speed: 0.11,
+                tilt: -0.25,
+                hasRing: false,
+                moons: 2,
+                palette: ["#ff6b9d", "#ff9e00", "#7209b7", "#ffb5a7"],
+                dotColor: "#ff6b9d"
+            },
+            {
+                id: 3,
+                name: "Yüzünün Kusursuzluğu",
+                tag: "Gezegen #3 • 10 Üzerinden Sonsuzluk",
+                icon: "💎",
+                distanceLabel: "Her Çizgisi Şaheser",
+                atmosphere: "Tanrısal Zarafet",
+                text: "Yüzünün her bir detayı, dudaklarının kusursuzluğu, teninin ışıltısı ve bakışlarındaki o derinlik en usta sanatçıların bile hayal edemeyeceği kadar benzersiz. En doğal halinle bile kainatın en nadide mücevherinden daha parlak, daha göz alıcı ve daha büyüleyicisin.",
+                orbitRadius: 465,
+                size: 22,
+                speed: 0.085,
+                tilt: 0.15,
+                hasRing: true,
+                ringColor: 0xff9e00,
+                moons: 2,
+                palette: ["#ffd700", "#ff7b00", "#ff0055", "#fff3b0"],
+                dotColor: "#ffd700"
+            },
+            {
+                id: 4,
+                name: "Endamının Büyüsü",
+                tag: "Gezegen #4 • Eşsiz Zarafet Yörüngesi",
+                icon: "🌙",
+                distanceLabel: "Baştan Ayağa Afet",
+                atmosphere: "Aklımı Başımdan Alan Aura",
+                text: "Saçlarının her bir telinden duruşundaki o asil ve büyüleyici zarafete kadar adeta özenle yaratılmış bir şahesersin. Ne giyersen giy, hangi halde olursan ol; senin o kuğu gibi süzülen endamın ve nefes kesen güzelliğin karşısında büyülenmemek imkansız.",
+                orbitRadius: 590,
+                size: 18,
+                speed: 0.07,
+                tilt: 0.42,
+                hasRing: true,
+                ringColor: 0xc77dff,
+                moons: 1,
+                palette: ["#c77dff", "#7b2cbf", "#48cae4", "#f72585"],
+                dotColor: "#c77dff"
+            },
+            {
+                id: 5,
+                name: "Sesinin ve Kokunun İhtişamı",
+                tag: "Gezegen #5 • Ruhumu Sarhoş Eden Etki",
+                icon: "🌹",
+                distanceLabel: "Huzurun Başkenti",
+                atmosphere: "Cennet Bahçesi",
+                text: "Sesinin tonundaki o sıcaklık ruhuma dokunduğu an dünyadaki bütün fırtınalar diniyor. Kokun, varlığın ve o tatlı nazın bile başlı başına bir sanat eseri; sana her baktığımda kalbimin ilk günkü heyecanla deli gibi çarpmasının tek sebebi senin bu erişilmez güzelliğin.",
+                orbitRadius: 715,
+                size: 15,
+                speed: 0.058,
+                tilt: -0.38,
+                hasRing: true,
+                ringColor: 0xff4d6d,
+                moons: 1,
+                palette: ["#ff4d6d", "#c9184a", "#ffb3c1", "#590d22"],
+                dotColor: "#ff4d6d"
+            },
+            {
+                id: 6,
+                name: "Kalbinin Asaleti",
+                tag: "Gezegen #6 • En Nadir Hazine",
+                icon: "💖",
+                distanceLabel: "Eşi Benzeri Olmayan Ruh",
+                atmosphere: "Saf Merhamet ve Işıltı",
+                text: "Sadece baş döndüren dış güzelliğinle değil; o tertemiz kalbinin merhametiyle, inceliğinle ve ruhunun asaletiyle de dünyada eşi benzeri olmayan bir kraliçesin. Senin gibi hem göze hem kalbe hükümdarlık eden bir kadına aşık olmak, hayatımın en ihtişamlı şansı.",
+                orbitRadius: 835,
+                size: 17,
+                speed: 0.046,
+                tilt: 0.28,
+                hasRing: false,
+                moons: 3,
+                palette: ["#06d6a0", "#118ab2", "#073b4c", "#80ffdb"],
+                dotColor: "#06d6a0"
+            },
+            {
+                id: 7,
+                name: "Kainatın Tek Kraliçesi",
+                tag: "Gezegen #7 • Eda'mın Sonsuz İmparatorluğu",
+                icon: "🪐",
+                distanceLabel: "Kalbimdeki Ebedi Tahtın",
+                atmosphere: "Sonsuz Hayranlık",
+                text: "Milyarlarca yıldız, yüzlerce galaksi ve bütün bir evren bir araya gelse, senin tek bir kirpiğinin, tek bir bakışının güzelliğine erişemez. Sen benim gözümde de kalbimde de dün, bugün ve sonsuza dek kainatın en güzel, en alımlı ve en büyüleyici kadınısın Eda'm.",
+                orbitRadius: 960,
+                size: 21,
+                speed: 0.036,
+                tilt: 0.5,
+                hasRing: true,
+                ringColor: 0xffe5ec,
+                moons: 2,
+                palette: ["#ffd700", "#ff6b9d", "#b5179e", "#ffffff"],
+                dotColor: "#ffe5ec"
+            }
+        ];
+
+        const wishMessages = [
+            "Tek dileğim: Bugünkü saçmalığımı unutup yine eskisi gibi gülmen ✨",
+            "Kayan yıldız: Kırgınlığın hemen geçsin kurban olduğum 🤍",
+            "Bir dilek tuttum: Bir daha bilmediğim kıyafet hakkında blöf yapmayacağım ❤️",
+            "Tek isteğim: O güzel yüzün hiç asılmasın yavrum ✨",
+            "Dileğim: En kısa zamanda Konya'ya gelip sana sıkıca sarılmak 💫",
+            "Kayan yıldız: Pazara da gitsen nereye de gitsen hep benim en güzelimsin ♥"
+        ];
+
+        // ============================================================================
+        // 3. WEB AUDIO API ROMANTİK MÜZİK KUTUSU
+        // ============================================================================
+        class RomanticMusicBox {
+            constructor() {
+                this.ctx = null;
+                this.isPlaying = false;
+                this.interval = null;
+                this.noteIndex = 0;
+                this.melody = [
+                    349.23, 440.00, 523.25, 659.25, 523.25, 440.00,
+                    392.00, 493.88, 587.33, 659.25, 587.33, 493.88,
+                    329.63, 392.00, 493.88, 587.33, 493.88, 392.00,
+                    220.00, 329.63, 440.00, 523.25, 493.88, 440.00
+                ];
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+            }
+
+            playNote(freq, duration = 2.4, volume = 0.075, type = 'sine') {
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, now);
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.exponentialRampToValueAtTime(volume, now + 0.06);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + duration);
+            }
+
+            playWishChime() {
+                this.init();
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                [523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((f, idx) => {
+                    setTimeout(() => this.playNote(f, 1.8, 0.06, 'triangle'), idx * 75);
+                });
+            }
+
+            playWarpSound() {
+                this.init();
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                [293.66, 440.00, 587.33, 880.00].forEach((f, idx) => {
+                    setTimeout(() => this.playNote(f, 1.6, 0.055, 'sine'), idx * 65);
+                });
+            }
+
+            playCelebrationChord() {
+                this.init();
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50, 1318.51].forEach((f, idx) => {
+                    setTimeout(() => this.playNote(f, 3.2, 0.085, 'sine'), idx * 85);
+                });
+            }
+
+            start() {
+                this.init();
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                if (this.isPlaying) return;
+                this.isPlaying = true;
+                this.interval = setInterval(() => {
+                    if (!this.isPlaying) return;
+                    const freq = this.melody[this.noteIndex % this.melody.length];
+                    this.playNote(freq, 2.4, 0.075, 'sine');
+                    if (this.noteIndex % 6 === 0) {
+                        this.playNote(freq * 0.5, 4.2, 0.035, 'triangle');
+                    }
+                    this.noteIndex++;
+                }, 460);
+            }
+
+            stop() {
+                this.isPlaying = false;
+                if (this.interval) clearInterval(this.interval);
+            }
+
+            toggle() {
+                if (this.isPlaying) {
+                    this.stop();
+                    return false;
+                } else {
+                    this.start();
+                    return true;
+                }
+            }
+        }
+
+        const musicBox = new RomanticMusicBox();
+
+        // ============================================================================
+        // 4. THREE.JS SAHNESİ, MORFOLOJİ VE 3D UZAY GEMİSİ
+        // ============================================================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050509, 0.00021);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.2, 16000);
+        camera.position.set(0, 35, 195);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // Serbest Bakış Modu için OrbitControls
+        const orbitControls = new OrbitControls(camera, renderer.domElement);
+        orbitControls.enableDamping = true;
+        orbitControls.dampingFactor = 0.065;
+        orbitControls.enablePan = true;
+        orbitControls.enableZoom = true;
+        orbitControls.minDistance = 14;
+        orbitControls.maxDistance = 3400;
+        orbitControls.enabled = false; // Başlangıçta Uçuş Modu aktif
+
+        function createGlowTexture(innerColor = 'rgba(255, 255, 255, 1)', midColor = 'rgba(255, 107, 157, 0.45)') {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            grad.addColorStop(0, innerColor);
+            grad.addColorStop(0.28, 'rgba(255, 225, 240, 0.85)');
+            grad.addColorStop(0.62, midColor);
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 64, 64);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        const glowTexture = createGlowTexture();
+
+        // 3D ZARİF UZAY GEMİSİ MODELİ (Üçüncü Şahıs Mobil Oyun Görünümü)
+        const shipGroup = new THREE.Group();
+        scene.add(shipGroup);
+
+        // Gövde (İleri -Z yönüne bakar)
+        const hullMat = new THREE.MeshBasicMaterial({ color: 0xeeeaf2 });
+        const trimMat = new THREE.MeshBasicMaterial({ color: 0xe5989b });
+        const glassMat = new THREE.MeshBasicMaterial({ color: 0x2a2f4a });
+        const engineCoreMat = new THREE.MeshBasicMaterial({ color: 0xffb5a7 });
+        const engineGlowMat = new THREE.MeshBasicMaterial({
+            color: 0xff6b9d,
+            transparent: true,
+            opacity: 0.6,
+            blending: THREE.AdditiveBlending
+        });
+
+        const noseGeo = new THREE.ConeGeometry(0.95, 5.2, 6);
+        noseGeo.rotateX(-Math.PI / 2);
+        const noseMesh = new THREE.Mesh(noseGeo, hullMat);
+        noseMesh.scale.set(1.15, 0.55, 1);
+        shipGroup.add(noseMesh);
+
+        // Kanatlar
+        const wingGeo = new THREE.BoxGeometry(5.6, 0.14, 2.0);
+        const wingMesh = new THREE.Mesh(wingGeo, trimMat);
+        wingMesh.position.set(0, -0.05, 0.85);
+        shipGroup.add(wingMesh);
+
+        // Kanat uçları
+        const tipGeo = new THREE.SphereGeometry(0.18, 8, 8);
+        const leftTip = new THREE.Mesh(tipGeo, new THREE.MeshBasicMaterial({ color: 0xffd700 }));
+        leftTip.position.set(-2.8, -0.05, 1.35);
+        const rightTip = leftTip.clone();
+        rightTip.position.set(2.8, -0.05, 1.35);
+        shipGroup.add(leftTip, rightTip);
+
+        // Kokpit camı
+        const canopyGeo = new THREE.SphereGeometry(0.55, 12, 12);
+        const canopyMesh = new THREE.Mesh(canopyGeo, glassMat);
+        canopyMesh.scale.set(0.85, 0.55, 2.1);
+        canopyMesh.position.set(0, 0.34, -0.2);
+        shipGroup.add(canopyMesh);
+
+        // Çift arka motor iticisi
+        const nozzleGeo = new THREE.CylinderGeometry(0.24, 0.32, 0.65, 10);
+        nozzleGeo.rotateX(Math.PI / 2);
+        const nozzleL = new THREE.Mesh(nozzleGeo, glassMat);
+        nozzleL.position.set(-0.62, 0, 2.45);
+        const nozzleR = nozzleL.clone();
+        nozzleR.position.set(0.62, 0, 2.45);
+        shipGroup.add(nozzleL, nozzleR);
+
+        const flameGeo = new THREE.ConeGeometry(0.25, 1.6, 10);
+        flameGeo.rotateX(Math.PI / 2);
+        flameGeo.translate(0, 0, 0.8);
+        const flameL = new THREE.Mesh(flameGeo, engineCoreMat);
+        flameL.position.set(-0.62, 0, 2.65);
+        const flameR = flameL.clone();
+        flameR.position.set(0.62, 0, 2.65);
+
+        const haloSpriteL = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: glowTexture, color: 0xff8da1, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending
+        }));
+        haloSpriteL.scale.set(2.4, 2.4, 1);
+        haloSpriteL.position.set(-0.62, 0, 2.85);
+
+        const haloSpriteR = haloSpriteL.clone();
+        haloSpriteR.position.set(0.62, 0, 2.85);
+
+        shipGroup.add(flameL, flameR, haloSpriteL, haloSpriteR);
+
+        // Gemi Motor İzi Parçacıkları
+        const TRAIL_COUNT = 90;
+        const trailPositions = new Float32Array(TRAIL_COUNT * 3);
+        const trailAges = new Float32Array(TRAIL_COUNT);
+        for (let i = 0; i < TRAIL_COUNT; i++) trailAges[i] = 1;
+        const trailGeo = new THREE.BufferGeometry();
+        trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+        const trailPoints = new THREE.Points(trailGeo, new THREE.PointsMaterial({
+            color: 0xffb5c5,
+            size: 2.2,
+            map: glowTexture,
+            transparent: true,
+            opacity: 0.55,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        }));
+        scene.add(trailPoints);
+        let trailCursor = 0;
+        let trailEmitAccum = 0;
+
+        // Merkez Partikül Morfolojisi
+        const PARTICLE_COUNT = 16000;
+        const morphGeo = new THREE.BufferGeometry();
+        const currentPos = new Float32Array(PARTICLE_COUNT * 3);
+        const targetPos = new Float32Array(PARTICLE_COUNT * 3);
+        const colors = new Float32Array(PARTICLE_COUNT * 3);
+
+        const shapes = {
+            heart: new Float32Array(PARTICLE_COUNT * 3),
+            infinity: new Float32Array(PARTICLE_COUNT * 3),
+            rose: new Float32Array(PARTICLE_COUNT * 3),
+            galaxy: new Float32Array(PARTICLE_COUNT * 3),
+            saturn: new Float32Array(PARTICLE_COUNT * 3),
+            dna: new Float32Array(PARTICLE_COUNT * 3)
+        };
+
+        const colorPalette = [
+            new THREE.Color(0xff6b9d),
+            new THREE.Color(0xffd700),
+            new THREE.Color(0xffa8c5),
+            new THREE.Color(0xc77dff),
+            new THREE.Color(0x4cc9f0)
+        ];
+
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            const i3 = i * 3;
+
+            const t = Math.random() * Math.PI * 2;
+            const u = (Math.random() - 0.5) * Math.PI;
+            const spread = 0.84 + Math.random() * 0.28;
+            shapes.heart[i3] = 16 * Math.pow(Math.sin(t), 3) * Math.cos(u) * 2.55 * spread;
+            shapes.heart[i3 + 1] = (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * Math.cos(u) * 2.55 * spread;
+            shapes.heart[i3 + 2] = 8.5 * Math.sin(u) * 2.55 * spread;
+
+            const angle = (i / PARTICLE_COUNT) * Math.PI * 2;
+            const scaleInf = 66;
+            const denom = 1 + Math.sin(angle) * Math.sin(angle);
+            shapes.infinity[i3] = (scaleInf * Math.cos(angle)) / denom + (Math.random() - 0.5) * 6.5;
+            shapes.infinity[i3 + 1] = (scaleInf * Math.sin(angle) * Math.cos(angle)) / denom + (Math.random() - 0.5) * 6.5;
+            shapes.infinity[i3 + 2] = Math.sin(angle * 2) * 16 + (Math.random() - 0.5) * 6.5;
+
+            const phi = i * 0.1375;
+            const r = 1.35 * Math.sqrt(i) * 0.48;
+            const petal = Math.sin(5 * phi) * 9.5;
+            shapes.rose[i3] = (r + petal * 0.32) * Math.cos(phi);
+            shapes.rose[i3 + 1] = (Math.sin(r * 0.32) * 22) - 6;
+            shapes.rose[i3 + 2] = (r + petal * 0.32) * Math.sin(phi);
+
+            const arm = i % 4;
+            const rad = Math.pow(Math.random(), 0.75) * 115;
+            const spin = rad * 0.075 + (arm * (Math.PI * 2 / 4));
+            shapes.galaxy[i3] = Math.cos(spin) * rad + (Math.random() - 0.5) * 11;
+            shapes.galaxy[i3 + 1] = (Math.random() - 0.5) * (22 - rad * 0.14);
+            shapes.galaxy[i3 + 2] = Math.sin(spin) * rad + (Math.random() - 0.5) * 11;
+
+            if (i < PARTICLE_COUNT * 0.38) {
+                const sRadius = 28 * Math.cbrt(Math.random());
+                const sTheta = Math.random() * Math.PI * 2;
+                const sPhi = Math.acos(2 * Math.random() - 1);
+                shapes.saturn[i3] = sRadius * Math.sin(sPhi) * Math.cos(sTheta);
+                shapes.saturn[i3 + 1] = sRadius * Math.sin(sPhi) * Math.sin(sTheta);
+                shapes.saturn[i3 + 2] = sRadius * Math.cos(sPhi);
+            } else {
+                const ringAngle = Math.random() * Math.PI * 2;
+                const ringDist = 42 + Math.random() * 56;
+                const rx = Math.cos(ringAngle) * ringDist;
+                const rz = Math.sin(ringAngle) * ringDist;
+                const ry = (Math.random() - 0.5) * 2.5;
+                const tiltA = 0.42;
+                shapes.saturn[i3] = rx;
+                shapes.saturn[i3 + 1] = ry * Math.cos(tiltA) - rz * Math.sin(tiltA);
+                shapes.saturn[i3 + 2] = ry * Math.sin(tiltA) + rz * Math.cos(tiltA);
+            }
+
+            const strand = i % 2 === 0 ? 0 : Math.PI;
+            const dnaY = ((i / PARTICLE_COUNT) - 0.5) * 130;
+            const dnaAngle = dnaY * 0.11 + strand;
+            const dnaRadius = 26 + Math.sin(dnaY * 0.05) * 6;
+            if (i % 10 === 0) {
+                const bridgeLerp = (Math.random() - 0.5) * 2;
+                shapes.dna[i3] = Math.cos(dnaY * 0.11) * dnaRadius * bridgeLerp;
+                shapes.dna[i3 + 1] = dnaY;
+                shapes.dna[i3 + 2] = Math.sin(dnaY * 0.11) * dnaRadius * bridgeLerp;
+            } else {
+                shapes.dna[i3] = Math.cos(dnaAngle) * dnaRadius + (Math.random() - 0.5) * 3.5;
+                shapes.dna[i3 + 1] = dnaY + (Math.random() - 0.5) * 2.5;
+                shapes.dna[i3 + 2] = Math.sin(dnaAngle) * dnaRadius + (Math.random() - 0.5) * 3.5;
+            }
+
+            currentPos[i3] = (Math.random() - 0.5) * 900;
+            currentPos[i3 + 1] = (Math.random() - 0.5) * 900;
+            currentPos[i3 + 2] = (Math.random() - 0.5) * 900;
+
+            targetPos[i3] = shapes.heart[i3];
+            targetPos[i3 + 1] = shapes.heart[i3 + 1];
+            targetPos[i3 + 2] = shapes.heart[i3 + 2];
+
+            const col = colorPalette[i % colorPalette.length];
+            colors[i3] = col.r;
+            colors[i3 + 1] = col.g;
+            colors[i3 + 2] = col.b;
+        }
+
+        morphGeo.setAttribute('position', new THREE.BufferAttribute(currentPos, 3));
+        morphGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const morphMat = new THREE.PointsMaterial({
+            size: 3.1,
+            map: glowTexture,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.92,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+
+        const morphParticles = new THREE.Points(morphGeo, morphMat);
+        scene.add(morphParticles);
+
+        function setShape(shapeName) {
+            const arr = shapes[shapeName];
+            if (!arr) return;
+            for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
+                targetPos[i] = arr[i];
+            }
+            logUserAction("sekil_degistirildi", `Merkez şekli '${shapeName}' yapıldı`);
+        }
+
+        // ============================================================================
+        // 5. DERİN UZAY YILDIZLARI & UZAY TOZU
+        // ============================================================================
+        const deepSpaceGroup = new THREE.Group();
+        scene.add(deepSpaceGroup);
+
+        function createStarField(count, spread, size, hexColor, opacity) {
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(count * 3);
+            for (let i = 0; i < count * 3; i++) pos[i] = (Math.random() - 0.5) * spread;
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            return new THREE.Points(geo, new THREE.PointsMaterial({
+                color: hexColor, size, map: glowTexture, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending
+            }));
+        }
+
+        deepSpaceGroup.add(
+            createStarField(12000, 6500, 4.5, 0xffffff, 0.72),
+            createStarField(6500, 5000, 7.2, 0xffb3c6, 0.62),
+            createStarField(4000, 4200, 9.5, 0xffe599, 0.56)
+        );
+
+        const DUST_COUNT = 260;
+        const DUST_RANGE = 220;
+        const dustGeo = new THREE.BufferGeometry();
+        const dustPos = new Float32Array(DUST_COUNT * 3);
+        for (let i = 0; i < DUST_COUNT * 3; i++) dustPos[i] = (Math.random() - 0.5) * DUST_RANGE;
+        dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+        const dustPoints = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+            color: 0xffffff, size: 1.35, map: glowTexture, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending
+        }));
+        scene.add(dustPoints);
+
+        // ============================================================================
+        // 6. ETKİLEŞİMLİ YILDIZLAR (7 PEMBE TAŞ + 100 ALTIN YILDIZ)
+        // ============================================================================
+        const interactiveGroup = new THREE.Group();
+        scene.add(interactiveGroup);
+        const clickableObjects = [];
+        const peaceCrystalMeshes = [];
+        const goldStarMeshes = [];
+
+        const peaceGeo = new THREE.OctahedronGeometry(4.2, 0);
+        const peaceMat = new THREE.MeshBasicMaterial({ color: 0xff6b9d });
+        const peaceHaloGeo = new THREE.SphereGeometry(8.2, 16, 16);
+        const peaceHaloMat = new THREE.MeshBasicMaterial({
+            color: 0xff6b9d, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending
+        });
+        const crystalRingGeo = new THREE.RingGeometry(5.5, 6.2, 32);
+        const crystalRingMat = new THREE.MeshBasicMaterial({
+            color: 0xffd700, side: THREE.DoubleSide, transparent: true, opacity: 0.65, blending: THREE.AdditiveBlending
+        });
+
+        peaceReasons.forEach((item, idx) => {
+            const mesh = new THREE.Mesh(peaceGeo, peaceMat.clone());
+            const halo = new THREE.Mesh(peaceHaloGeo, peaceHaloMat.clone());
+            const ring = new THREE.Mesh(crystalRingGeo, crystalRingMat.clone());
+            ring.rotation.x = Math.PI / 3;
+            mesh.add(halo);
+            mesh.add(ring);
+
+            const angle = (idx / peaceReasons.length) * Math.PI * 2;
+            const radius = 84;
+            mesh.position.set(Math.cos(angle) * radius, Math.sin(angle * 2) * 22, Math.sin(angle) * radius);
+
+            mesh.userData = {
+                type: 'crystal',
+                isPeaceStar: true,
+                crystalIndex: idx + 1,
+                title: item.title,
+                text: item.text,
+                icon: "♦",
+                haloMesh: halo
+            };
+
+            interactiveGroup.add(mesh);
+            clickableObjects.push(mesh);
+            peaceCrystalMeshes.push(mesh);
+        });
+
+        const goldGeo = new THREE.SphereGeometry(2.3, 12, 12);
+        const goldMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
+        const goldHaloGeo = new THREE.SphereGeometry(6.2, 12, 12);
+        const goldHaloMat = new THREE.MeshBasicMaterial({
+            color: 0xffe55c, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending
+        });
+
+        reasons.forEach((reason, index) => {
+            const star = new THREE.Mesh(goldGeo, goldMat.clone());
+            const halo = new THREE.Mesh(goldHaloGeo, goldHaloMat.clone());
+            star.add(halo);
+
+            const radius = 115 + Math.pow(Math.random(), 0.85) * 580;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+
+            star.position.set(
+                radius * Math.sin(phi) * Math.cos(theta),
+                radius * Math.sin(phi) * Math.sin(theta) * 0.75,
+                radius * Math.cos(phi)
+            );
+
+            star.userData = {
+                type: 'star',
+                isPeaceStar: false,
+                index: index + 1,
+                title: `Seni Sevmemin #${index + 1}. Nedeni`,
+                text: reason,
+                icon: "✦",
+                haloMesh: halo
+            };
+
+            interactiveGroup.add(star);
+            clickableObjects.push(star);
+            goldStarMeshes.push(star);
+        });
+
+        // ============================================================================
+        // 7. 7 KEŞFEDİLEBİLİR GEZEGEN SİSTEMİ + 3D ETİKETLER
+        // ============================================================================
+        const planetsGroup = new THREE.Group();
+        scene.add(planetsGroup);
+        const planetObjects = [];
+        const worldLabelsLayer = document.getElementById('world-labels-layer');
+
+        function createPlanetTexture(palette) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createLinearGradient(0, 0, 0, 256);
+            grad.addColorStop(0, palette[0]);
+            grad.addColorStop(0.35, palette[1]);
+            grad.addColorStop(0.7, palette[2]);
+            grad.addColorStop(1, palette[0]);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 512, 256);
+
+            for (let i = 0; i < 28; i++) {
+                ctx.fillStyle = palette[i % palette.length];
+                ctx.globalAlpha = 0.2 + Math.random() * 0.22;
+                ctx.fillRect(0, Math.random() * 256, 512, 4 + Math.random() * 16);
+            }
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createOrbitLine(radius, colorHex) {
+            const pts = [];
+            for (let i = 0; i <= 128; i++) {
+                const a = (i / 128) * Math.PI * 2;
+                pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+            }
+            return new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints(pts),
+                new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: 0.13, blending: THREE.AdditiveBlending })
+            );
+        }
+
+        planetsData.forEach((pData, idx) => {
+            scene.add(createOrbitLine(pData.orbitRadius, pData.ringColor || 0xff6b9d));
+
+            const pContainer = new THREE.Group();
+            const startAngle = (idx / planetsData.length) * Math.PI * 2 + 0.4;
+            pContainer.position.set(
+                Math.cos(startAngle) * pData.orbitRadius,
+                Math.sin(startAngle * 2) * 18,
+                Math.sin(startAngle) * pData.orbitRadius
+            );
+
+            const tex = createPlanetTexture(pData.palette);
+            const planetMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(pData.size, 32, 32),
+                new THREE.MeshBasicMaterial({ map: tex })
+            );
+            planetMesh.rotation.z = pData.tilt;
+            pContainer.add(planetMesh);
+
+            const atmoMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(pData.size * 1.32, 24, 24),
+                new THREE.MeshBasicMaterial({
+                    color: new THREE.Color(pData.dotColor), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending
+                })
+            );
+            pContainer.add(atmoMesh);
+
+            if (pData.hasRing) {
+                const ringMesh = new THREE.Mesh(
+                    new THREE.RingGeometry(pData.size * 1.45, pData.size * 2.35, 64),
+                    new THREE.MeshBasicMaterial({
+                        color: pData.ringColor, side: THREE.DoubleSide, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending
+                    })
+                );
+                ringMesh.rotation.x = Math.PI / 2.2;
+                ringMesh.rotation.y = pData.tilt;
+                pContainer.add(ringMesh);
+            }
+
+            const moonsArr = [];
+            for (let m = 0; m < pData.moons; m++) {
+                const moonMesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(pData.size * 0.18, 12, 12),
+                    new THREE.MeshBasicMaterial({ color: 0xffffff })
+                );
+                pContainer.add(moonMesh);
+                moonsArr.push({
+                    mesh: moonMesh,
+                    dist: pData.size * (2.6 + m * 0.7),
+                    speed: 1.4 + m * 0.6,
+                    phase: m * 2.1
+                });
+            }
+
+            // Yüzen hafif gezegen etiketi
+            const floatEl = document.createElement('div');
+            floatEl.className = 'planet-float-label';
+            floatEl.innerHTML = `<span class="planet-float-dot" style="background:${pData.dotColor};"></span><span>${pData.name}</span><span class="planet-float-dist"></span>`;
+            worldLabelsLayer.appendChild(floatEl);
+
+            const sharedUserData = {
+                type: 'planet',
+                planetData: pData,
+                container: pContainer,
+                angle: startAngle,
+                moons: moonsArr,
+                planetMesh,
+                atmoMesh,
+                floatEl,
+                floatDistEl: floatEl.querySelector('.planet-float-dist')
+            };
+
+            floatEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                warpToPlanet(sharedUserData, true);
+            });
+
+            planetMesh.userData = sharedUserData;
+            atmoMesh.userData = sharedUserData;
+
+            planetsGroup.add(pContainer);
+            clickableObjects.push(planetMesh, atmoMesh);
+            planetObjects.push(sharedUserData);
+        });
+
+        // ============================================================================
+        // 8. ÇİFT MODLU KONTROL SİSTEMİ: UÇUŞ MODU & SERBEST BAKIŞ
+        // ============================================================================
+        let viewMode = 'flight'; // 'flight' | 'explore'
+
+        const shipState = {
+            pos: new THREE.Vector3(0, 29, 178),
+            yaw: 0,
+            pitch: -0.15,
+            roll: 0,
+            throttle: 0,       // 0 .. 1 arası kalıcı gaz (veya negatif geri)
+            currentSpeed: 0,
+            joyX: 0,
+            joyY: 0,
+            turnKeyLeft: false,
+            turnKeyRight: false,
+            pitchKeyUp: false,
+            pitchKeyDown: false,
+            boost: false
+        };
+
+        let lockedPlanetObj = null;
+        let warpAnim = null;
+        let navTarget = null; // { name, getPos: () => Vector3, onWarp: () => void }
+        let currentNearestTarget = null;
+        let lastFlightLogTime = 0;
+
+        const btnModeFlight = document.getElementById('btn-mode-flight');
+        const btnModeExplore = document.getElementById('btn-mode-explore');
+        const bottomCockpit = document.getElementById('bottom-cockpit');
+
+        function setViewMode(mode) {
+            if (viewMode === mode) return;
+            viewMode = mode;
+
+            btnModeFlight.classList.toggle('active', mode === 'flight');
+            btnModeExplore.classList.toggle('active', mode === 'explore');
+            bottomCockpit.classList.toggle('explore-only', mode === 'explore');
+
+            if (mode === 'explore') {
+                // Uçuş Modu -> Serbest Bakış (OrbitControls)
+                shipGroup.visible = false;
+                trailPoints.visible = false;
+                orbitControls.enabled = true;
+                warpAnim = null;
+
+                const forward = new THREE.Vector3();
+                camera.getWorldDirection(forward);
+                if (lockedPlanetObj) {
+                    orbitControls.target.copy(lockedPlanetObj.container.position);
+                } else {
+                    const distToOrigin = camera.position.length();
+                    const focusDist = Math.min(Math.max(distToOrigin * 0.75, 80), 260);
+                    orbitControls.target.copy(camera.position).addScaledVector(forward, focusDist);
+                }
+                orbitControls.update();
+                showToast("Serbest Bakış: İstediğin gibi döndür ve yakınlaştır ✨");
+                logUserAction("mod_degisti", "Serbest Bakış moduna geçildi");
+            } else {
+                // Serbest Bakış -> Uçuş Modu
+                orbitControls.enabled = false;
+                warpAnim = null;
+                lockedPlanetObj = null;
+                document.getElementById('orbit-hud').classList.add('hidden');
+
+                const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+                shipState.yaw = e.y;
+                shipState.pitch = THREE.MathUtils.clamp(e.x, -1.25, 1.25);
+                shipState.roll = 0;
+
+                const dirQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(shipState.pitch, shipState.yaw, 0, 'YXZ'));
+                const aheadOffset = new THREE.Vector3(0, -3.6, -15.5).applyQuaternion(dirQuat);
+                shipState.pos.copy(camera.position).add(aheadOffset);
+
+                shipGroup.position.copy(shipState.pos);
+                shipGroup.visible = true;
+                trailPoints.visible = true;
+                setThrottle(0);
+                showToast("Uçuş Modu: Sol kumandayla yönlendir, sağdan hızını seç 🚀");
+                logUserAction("mod_degisti", "Uçuş Moduna geçildi");
+            }
+        }
+
+        btnModeFlight.addEventListener('click', () => setViewMode('flight'));
+        btnModeExplore.addEventListener('click', () => setViewMode('explore'));
+
+        // Gaz Kolu (Throttle) ve Hız Presetleri
+        const throttleTrack = document.getElementById('throttle-track');
+        const throttleFill = document.getElementById('throttle-fill');
+        const throttleThumb = document.getElementById('throttle-thumb');
+        const speedReadoutCaption = document.getElementById('speed-readout-caption');
+        const presetButtons = document.querySelectorAll('.speed-preset-btn');
+
+        function setThrottle(val) {
+            shipState.throttle = THREE.MathUtils.clamp(val, -0.3, 1.0);
+            const pct = Math.max(0, shipState.throttle) * 100;
+            throttleFill.style.height = `${pct}%`;
+
+            const trackH = throttleTrack.clientHeight || 118;
+            const thumbH = 24;
+            const norm = Math.max(0, shipState.throttle);
+            const bottomPx = 2 + norm * (trackH - thumbH - 4);
+            throttleThumb.style.bottom = `${bottomPx}px`;
+
+            presetButtons.forEach(btn => {
+                const pVal = parseFloat(btn.dataset.speed);
+                btn.classList.toggle('active', Math.abs(shipState.throttle - pVal) < 0.06);
+            });
+
+            if (shipState.throttle < -0.05) speedReadoutCaption.innerText = "Hız: Geri";
+            else if (shipState.throttle < 0.05) speedReadoutCaption.innerText = "Hız: Duruyor";
+            else if (shipState.throttle < 0.55) speedReadoutCaption.innerText = "Hız: Seyir";
+            else speedReadoutCaption.innerText = "Hız: Hızlı";
+        }
+
+        presetButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (viewMode !== 'flight') setViewMode('flight');
+                warpAnim = null;
+                lockedPlanetObj = null;
+                document.getElementById('orbit-hud').classList.add('hidden');
+                setThrottle(parseFloat(btn.dataset.speed));
+            });
+        });
+
+        let throttleDragging = false;
+        let throttlePointerId = null;
+
+        function updateThrottleFromClientY(clientY) {
+            const rect = throttleTrack.getBoundingClientRect();
+            const ratio = 1 - (clientY - rect.top) / rect.height;
+            setThrottle(THREE.MathUtils.clamp(ratio, 0, 1));
+        }
+
+        throttleTrack.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            throttleDragging = true;
+            throttlePointerId = e.pointerId;
+            throttleTrack.setPointerCapture(e.pointerId);
+            warpAnim = null;
+            lockedPlanetObj = null;
+            document.getElementById('orbit-hud').classList.add('hidden');
+            updateThrottleFromClientY(e.clientY);
+        });
+
+        throttleTrack.addEventListener('pointermove', (e) => {
+            if (!throttleDragging || e.pointerId !== throttlePointerId) return;
+            updateThrottleFromClientY(e.clientY);
+        });
+
+        const endThrottleDrag = (e) => {
+            if (e.pointerId === throttlePointerId) {
+                throttleDragging = false;
+                throttlePointerId = null;
+            }
+        };
+        throttleTrack.addEventListener('pointerup', endThrottleDrag);
+        throttleTrack.addEventListener('pointercancel', endThrottleDrag);
+
+        // Sol Sanal Joystick (Uçuş Modu Yönlendirme)
+        const joyZone = document.getElementById('joystick-zone');
+        const joyKnob = document.getElementById('joystick-knob');
+        let joyActive = false;
+        let joyPointerId = null;
+        const maxJoyRadius = 34;
+
+        function updateJoystick(clientX, clientY) {
+            const rect = joyZone.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            let dx = clientX - cx;
+            let dy = clientY - cy;
+            const dist = Math.hypot(dx, dy);
+            if (dist > maxJoyRadius) {
+                dx = (dx / dist) * maxJoyRadius;
+                dy = (dy / dist) * maxJoyRadius;
+            }
+            joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            shipState.joyX = dx / maxJoyRadius;
+            shipState.joyY = dy / maxJoyRadius;
+            if (warpAnim || lockedPlanetObj) {
+                warpAnim = null;
+                lockedPlanetObj = null;
+                document.getElementById('orbit-hud').classList.add('hidden');
+            }
+        }
+
+        function resetJoystick() {
+            joyActive = false;
+            joyPointerId = null;
+            joyZone.classList.remove('active');
+            joyKnob.style.transform = `translate(0px, 0px)`;
+            shipState.joyX = 0;
+            shipState.joyY = 0;
+        }
+
+        joyZone.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            joyActive = true;
+            joyPointerId = e.pointerId;
+            joyZone.classList.add('active');
+            joyZone.setPointerCapture(e.pointerId);
+            updateJoystick(e.clientX, e.clientY);
+        });
+
+        joyZone.addEventListener('pointermove', (e) => {
+            if (!joyActive || e.pointerId !== joyPointerId) return;
+            updateJoystick(e.clientX, e.clientY);
+        });
+
+        joyZone.addEventListener('pointerup', resetJoystick);
+        joyZone.addEventListener('pointercancel', resetJoystick);
+
+        // Uçuş Modunda Ekrandan Sürükleyerek de Yönlendirme + Tekerlek ile Hız Ayarı
+        let skyDragging = false;
+        let skyPointerId = null;
+        let lastSkyPos = { x: 0, y: 0 };
+        let downPos = { x: 0, y: 0 };
+
+        renderer.domElement.addEventListener('pointerdown', (e) => {
+            downPos.x = e.clientX;
+            downPos.y = e.clientY;
+            if (viewMode === 'flight' && !anyModalOpen()) {
+                skyDragging = true;
+                skyPointerId = e.pointerId;
+                lastSkyPos.x = e.clientX;
+                lastSkyPos.y = e.clientY;
+            }
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (viewMode !== 'flight' || !skyDragging || e.pointerId !== skyPointerId) return;
+            const dx = e.clientX - lastSkyPos.x;
+            const dy = e.clientY - lastSkyPos.y;
+            lastSkyPos.x = e.clientX;
+            lastSkyPos.y = e.clientY;
+
+            if (warpAnim || lockedPlanetObj) {
+                warpAnim = null;
+                lockedPlanetObj = null;
+                document.getElementById('orbit-hud').classList.add('hidden');
+            }
+            shipState.yaw -= dx * 0.0042;
+            shipState.pitch = THREE.MathUtils.clamp(shipState.pitch - dy * 0.0038, -1.25, 1.25);
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            if (e.pointerId === skyPointerId) {
+                skyDragging = false;
+                skyPointerId = null;
+            }
+        });
+
+        renderer.domElement.addEventListener('wheel', (e) => {
+            if (anyModalOpen()) return;
+            if (viewMode === 'flight') {
+                e.preventDefault();
+                setThrottle(shipState.throttle - e.deltaY * 0.0008);
+            }
+        }, { passive: false });
+
+        // Klavye Desteği
+        window.addEventListener('keydown', (e) => {
+            if (document.activeElement && (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT')) return;
+            const code = e.code;
+            if (viewMode === 'flight') {
+                if (code === 'KeyW') setThrottle(Math.min(1, shipState.throttle + 0.15));
+                if (code === 'KeyS') setThrottle(Math.max(-0.25, shipState.throttle - 0.15));
+                if (code === 'Space') { e.preventDefault(); setThrottle(0); }
+                if (code === 'KeyA' || code === 'ArrowLeft') shipState.turnKeyLeft = true;
+                if (code === 'KeyD' || code === 'ArrowRight') shipState.turnKeyRight = true;
+                if (code === 'ArrowUp' || code === 'KeyE') shipState.pitchKeyUp = true;
+                if (code === 'ArrowDown' || code === 'KeyC' || code === 'KeyQ') shipState.pitchKeyDown = true;
+                if (code === 'ShiftLeft' || code === 'ShiftRight') shipState.boost = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const code = e.code;
+            if (code === 'KeyA' || code === 'ArrowLeft') shipState.turnKeyLeft = false;
+            if (code === 'KeyD' || code === 'ArrowRight') shipState.turnKeyRight = false;
+            if (code === 'ArrowUp' || code === 'KeyE') shipState.pitchKeyUp = false;
+            if (code === 'ArrowDown' || code === 'KeyC' || code === 'KeyQ') shipState.pitchKeyDown = false;
+            if (code === 'ShiftLeft' || code === 'ShiftRight') shipState.boost = false;
+        });
+
+        // ============================================================================
+        // 9. YÖN REHBERİ, KAYAN YILDIZLAR & GEZEGEN IŞINLANMA
+        // ============================================================================
+        const navGuidePill = document.getElementById('nav-guide-pill');
+        const navGuideArrow = document.getElementById('nav-guide-arrow');
+        const navGuideText = document.getElementById('nav-guide-text');
+
+        function setNavigationTarget(name, getPosFn, onWarpFn) {
+            navTarget = { name, getPos: getPosFn, onWarp: onWarpFn };
+            navGuidePill.style.display = 'flex';
+        }
+
+        function clearNavigationTarget() {
+            navTarget = null;
+            navGuidePill.style.display = 'none';
+        }
+
+        document.getElementById('nav-guide-warp').addEventListener('click', () => {
+            if (navTarget && navTarget.onWarp) navTarget.onWarp();
+        });
+        document.getElementById('nav-guide-close').addEventListener('click', clearNavigationTarget);
+
+        const shootingStars = [];
+        function spawnShootingStar(isWish = false) {
+            const length = isWish ? 95 : 55;
+            const start = new THREE.Vector3(
+                camera.position.x + (Math.random() - 0.5) * 900,
+                camera.position.y + 180 + Math.random() * 250,
+                camera.position.z + (Math.random() - 0.5) * 900
+            );
+            const dir = new THREE.Vector3((Math.random() - 0.5) * 2, -0.6 - Math.random() * 0.5, (Math.random() - 0.5) * 2).normalize();
+            const pts = [start.clone(), start.clone().sub(dir.clone().multiplyScalar(length))];
+            const line = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints(pts),
+                new THREE.LineBasicMaterial({ color: isWish ? 0xffd700 : 0xff8da1, transparent: true, opacity: 1, blending: THREE.AdditiveBlending })
+            );
+            scene.add(line);
+            shootingStars.push({ line, pos: start, dir, length, speed: isWish ? 420 : 320, life: 1.0 });
+        }
+
+        const shockwaves = [];
+        function triggerSupernova() {
+            const wave1 = new THREE.Mesh(
+                new THREE.RingGeometry(2, 6, 64),
+                new THREE.MeshBasicMaterial({ color: 0xff6b9d, side: THREE.DoubleSide, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending })
+            );
+            wave1.rotation.x = Math.PI / 2;
+            scene.add(wave1);
+            shockwaves.push({ mesh: wave1, scale: 1, opacity: 0.95 });
+            for (let i = 0; i < 5; i++) setTimeout(() => spawnShootingStar(true), i * 180);
+        }
+
+        const orbitHud = document.getElementById('orbit-hud');
+        const orbitHudLabel = document.getElementById('orbit-hud-label');
+
+        function warpToPlanet(planetObj, openModalAfter = true) {
+            clearNavigationTarget();
+            lockedPlanetObj = planetObj;
+            setThrottle(0);
+
+            const pPos = planetObj.container.position;
+            const dist = planetObj.planetData.size * 4.4 + 26;
+            const targetCamPos = new THREE.Vector3(pPos.x + dist * 0.72, pPos.y + dist * 0.35, pPos.z + dist * 0.72);
+
+            warpAnim = {
+                targetCamPos,
+                targetLook: pPos.clone(),
+                onArrive: openModalAfter ? () => openPlanetModal(planetObj.planetData) : null
+            };
+
+            musicBox.playWarpSound();
+            orbitHudLabel.innerText = planetObj.planetData.name;
+            orbitHud.classList.remove('hidden');
+
+            document.querySelectorAll('.planet-nav-btn').forEach(btn => {
+                btn.classList.toggle('active', Number(btn.dataset.pid) === planetObj.planetData.id);
+            });
+
+            logUserAction("gezegen_ziyaret", `${planetObj.planetData.name} gezegenine uçuldu`);
+        }
+
+        function returnToCore() {
+            clearNavigationTarget();
+            lockedPlanetObj = null;
+            setThrottle(0);
+            orbitHud.classList.add('hidden');
+
+            warpAnim = {
+                targetCamPos: new THREE.Vector3(0, 35, 195),
+                targetLook: new THREE.Vector3(0, 0, 0),
+                onArrive: null
+            };
+
+            musicBox.playWarpSound();
+            logUserAction("merkeze_donuldu", "Merkez Kalp yörüngesine dönüldü");
+        }
+
+        function zoomOutFullUniverse() {
+            clearNavigationTarget();
+            lockedPlanetObj = null;
+            setThrottle(0);
+            orbitHud.classList.add('hidden');
+
+            warpAnim = {
+                targetCamPos: new THREE.Vector3(0, 520, 1350),
+                targetLook: new THREE.Vector3(0, 0, 0),
+                onArrive: null
+            };
+
+            musicBox.playWarpSound();
+            logUserAction("evren_genel_bakis", "Uzaktan tüm evrene bakıldı");
+        }
+
+        // ============================================================================
+        // 10. MODALLAR & ETKİLEŞİM
+        // ============================================================================
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        const discoveredStars = new Set();
+        const discoveredCrystals = new Set();
+        const discoveredPlanets = new Set();
+
+        const reasonModal = document.getElementById('reason-modal');
+        const planetModal = document.getElementById('planet-modal');
+        const letterModal = document.getElementById('letter-modal');
+        const noteModal = document.getElementById('note-modal');
+        const logsModal = document.getElementById('logs-modal');
+
+        function anyModalOpen() {
+            return !reasonModal.classList.contains('hidden') ||
+                   !planetModal.classList.contains('hidden') ||
+                   !letterModal.classList.contains('hidden') ||
+                   !noteModal.classList.contains('hidden') ||
+                   !logsModal.classList.contains('hidden');
+        }
+
+        renderer.domElement.addEventListener('pointerup', (e) => {
+            if (Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 8) return;
+            if (anyModalOpen()) return;
+
+            pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(clickableObjects, true);
+
+            if (intersects.length > 0) {
+                let obj = intersects[0].object;
+                while (obj && !obj.userData.type && obj.parent) obj = obj.parent;
+                if (!obj || !obj.userData.type) return;
+
+                if (obj.userData.type === 'planet') {
+                    warpToPlanet(obj.userData, true);
+                } else {
+                    openStarModal(obj.userData);
+                }
+            }
+        });
+
+        function openStarModal(data) {
+            document.getElementById('modal-icon').innerText = data.icon || "✦";
+            document.getElementById('reason-number').innerText = data.title;
+            document.getElementById('reason-text').innerText = data.text;
+            reasonModal.classList.remove('hidden');
+
+            if (data.type === 'star' && data.index) {
+                discoveredStars.add(data.index);
+                document.getElementById('counter-text').innerText = `${discoveredStars.size}/100`;
+                if (data.haloMesh) data.haloMesh.material.color.setHex(0x4cc9f0);
+                logUserAction("yildiz_okundu", `${data.title}: ${data.text}`);
+            } else if (data.type === 'crystal' && data.crystalIndex) {
+                discoveredCrystals.add(data.crystalIndex);
+                document.getElementById('crystal-counter-text').innerText = `${discoveredCrystals.size}/7`;
+                if (data.haloMesh) data.haloMesh.material.color.setHex(0xffd700);
+                logUserAction("pembe_tas_okundu", data.title);
+            }
+
+            if (musicBox.isPlaying) musicBox.playNote(659.25, 1.5, 0.09);
+        }
+
+        function openPlanetModal(pData) {
+            document.getElementById('planet-modal-icon').innerText = pData.icon;
+            document.getElementById('planet-modal-tag').innerText = pData.tag;
+            document.getElementById('planet-modal-title').innerText = pData.name;
+            document.getElementById('planet-meta-dist').innerText = pData.distanceLabel;
+            document.getElementById('planet-meta-atm').innerText = pData.atmosphere;
+            document.getElementById('planet-modal-text').innerText = pData.text;
+
+            discoveredPlanets.add(pData.id);
+            document.getElementById('planet-counter-text').innerText = `${discoveredPlanets.size}/7`;
+            planetModal.classList.remove('hidden');
+            logUserAction("gezegen_notu_okundu", pData.name);
+        }
+
+        const proximityPrompt = document.getElementById('proximity-prompt');
+        const proximityPromptText = document.getElementById('proximity-prompt-text');
+
+        proximityPrompt.addEventListener('click', () => {
+            if (!currentNearestTarget) return;
+            if (currentNearestTarget.type === 'planet') {
+                openPlanetModal(currentNearestTarget.planetData);
+            } else {
+                openStarModal(currentNearestTarget);
+            }
+        });
+
+        // ============================================================================
+        // 11. KULLANICI NOT BIRAKMA VE LOG SİSTEMİ
+        // ============================================================================
+        const userNoteInput = document.getElementById('user-note-input');
+        const userNoteMood = document.getElementById('user-note-mood');
+        const userNotesList = document.getElementById('user-notes-list');
+
+        function openNoteModal() {
+            noteModal.classList.remove('hidden');
+            if (isAuthenticated && !notesListenerStarted) listenUserNotes();
+            logUserAction("not_paneli_acildi", "Kullanıcı not bırakma ekranını açtı");
+        }
+
+        document.getElementById('top-note-btn').addEventListener('click', openNoteModal);
+        document.getElementById('open-notes-dock-btn').addEventListener('click', openNoteModal);
+        document.getElementById('close-note-modal').addEventListener('click', () => noteModal.classList.add('hidden'));
+
+        document.getElementById('save-user-note-btn').addEventListener('click', () => {
+            const text = userNoteInput.value.trim();
+            const mood = userNoteMood.value;
+            if (!text) {
+                showToast("Önce bir not yaz kurban olduğum 🤍");
+                return;
+            }
+            if (!isAuthenticated || !database) {
+                showToast("Firebase bağlantısı henüz tamamlanmadı, lütfen internetini kontrol et.");
+                return;
+            }
+
+            const noteObj = {
+                duygu: mood,
+                not: text,
+                konum: `${Math.round(camera.position.x)}, ${Math.round(camera.position.y)}, ${Math.round(camera.position.z)}`,
+                tarih: new Date().toLocaleString('tr-TR'),
+                timestamp: Date.now()
+            };
+
+            database.ref(`${FB_ROOT}/notlar`).push(noteObj)
+                .then(() => {
+                    logUserAction("not_birakildi", `${mood}: ${text}`);
+                    userNoteInput.value = "";
+                    musicBox.playWishChime();
+                    showToast("Notun kalbime ve uzaya kaydedildi gülüm ✨");
+                })
+                .catch((err) => {
+                    showToast(`Kaydedilemedi: ${err?.code || err?.message || 'Hata'}`);
+                });
+        });
+
+        function listenUserNotes() {
+            if (!isAuthenticated || !database || notesListenerStarted) return;
+            notesListenerStarted = true;
+            database.ref(`${FB_ROOT}/notlar`).limitToLast(30).on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (!data) {
+                    userNotesList.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:0.8rem;">Henüz bırakılmış bir not yok. İlk notu sen bırak 🤍</div>`;
+                    return;
+                }
+                const arr = Object.keys(data).map(k => ({ id: k, ...data[k] })).sort((a, b) => b.timestamp - a.timestamp);
+                userNotesList.innerHTML = arr.map(item => `
+                    <div class="note-item-card">
+                        <div class="note-item-meta">
+                            <span>${escapeHtml(item.duygu || 'Not')}</span>
+                            <span>${escapeHtml(item.tarih || '')}</span>
+                        </div>
+                        <div>${escapeHtml(item.not || '')}</div>
+                    </div>
+                `).join('');
+            }, (err) => {
+                notesListenerStarted = false;
+                userNotesList.innerHTML = `<div style="text-align:center; color:#f87171; font-size:0.8rem;">Notlar okunamadı (${escapeHtml(err?.code || 'yetki hatası')})</div>`;
+            });
+        }
+
+        let secretClicks = 0;
+        let secretTimer = null;
+        document.getElementById('secret-log-trigger').addEventListener('click', () => {
+            secretClicks++;
+            clearTimeout(secretTimer);
+            secretTimer = setTimeout(() => { secretClicks = 0; }, 1200);
+            if (secretClicks >= 5) {
+                secretClicks = 0;
+                openLogsModal();
+            }
+        });
+
+        function openLogsModal() {
+            logsModal.classList.remove('hidden');
+            const feed = document.getElementById('logs-feed-container');
+            feed.innerHTML = `<div style="text-align:center; color:var(--text-muted);">Kayıtlar yükleniyor...</div>`;
+            if (!isAuthenticated || !database) {
+                feed.innerHTML = `<div style="text-align:center; color:var(--text-muted);">Firebase bağlantısı kurulmadı.</div>`;
+                return;
+            }
+            database.ref(`${FB_ROOT}/loglar`).limitToLast(50).once('value')
+                .then((snap) => {
+                    const val = snap.val();
+                    if (!val) {
+                        feed.innerHTML = `<div>Henüz kayıt yok.</div>`;
+                        return;
+                    }
+                    const list = Object.values(val).sort((a, b) => b.timestamp - a.timestamp);
+                    feed.innerHTML = list.map(l => `
+                        <div class="log-item">
+                            <div style="color:var(--accent-warm); font-weight:600;">[${escapeHtml(l.tarih || '')}] ${escapeHtml((l.eylem || '').toUpperCase())}</div>
+                            <div style="margin-top:3px;">${escapeHtml(l.detay || '')}</div>
+                            <div style="color:var(--text-muted); font-size:0.68rem; margin-top:3px;">Konum: (${l.konum?.x || 0}, ${l.konum?.y || 0}, ${l.konum?.z || 0}) • Yakın: ${escapeHtml(l.enYakinBirim || '-')}</div>
+                        </div>
+                    `).join('');
+                })
+                .catch((err) => {
+                    feed.innerHTML = `<div style="color:#f87171;">Loglar okunamadı: ${escapeHtml(err?.code || err?.message || '')}</div>`;
+                });
+        }
+
+        document.getElementById('close-logs-modal').addEventListener('click', () => logsModal.classList.add('hidden'));
+
+        // ============================================================================
+        // 12. MENÜLER VE DOCK KONTROLLERİ
+        // ============================================================================
+        const planetDrawer = document.getElementById('planet-drawer');
+        const planetNavList = document.getElementById('planet-nav-list');
+
+        const coreRow = document.createElement('div');
+        coreRow.className = 'planet-row';
+        coreRow.innerHTML = `
+            <button class="planet-nav-btn"><span class="planet-dot" style="background:#e5989b;"></span><span>Merkez Kalbe Uç</span></button>
+            <button class="planet-guide-mini" title="Yön Göster">Yön</button>
+        `;
+        coreRow.querySelector('.planet-nav-btn').addEventListener('click', () => { returnToCore(); planetDrawer.classList.remove('open'); });
+        coreRow.querySelector('.planet-guide-mini').addEventListener('click', () => {
+            setNavigationTarget("Merkez Kalp", () => new THREE.Vector3(0, 0, 0), returnToCore);
+            planetDrawer.classList.remove('open');
+        });
+        planetNavList.appendChild(coreRow);
+
+        const overviewRow = document.createElement('div');
+        overviewRow.className = 'planet-row';
+        overviewRow.innerHTML = `<button class="planet-nav-btn"><span class="planet-dot" style="background:#ebd8c8;"></span><span>Tüm Evrene Uzaktan Bak</span></button>`;
+        overviewRow.querySelector('.planet-nav-btn').addEventListener('click', () => { zoomOutFullUniverse(); planetDrawer.classList.remove('open'); });
+        planetNavList.appendChild(overviewRow);
+
+        planetsData.forEach((p, idx) => {
+            const pObj = planetObjects[idx];
+            const row = document.createElement('div');
+            row.className = 'planet-row';
+            row.innerHTML = `
+                <button class="planet-nav-btn" data-pid="${p.id}">
+                    <span class="planet-dot" style="background:${p.dotColor};"></span>
+                    <span>${p.name}</span>
+                </button>
+                <button class="planet-guide-mini" title="Sadece Yön Göster">Yön</button>
+            `;
+            row.querySelector('.planet-nav-btn').addEventListener('click', () => {
+                warpToPlanet(pObj, true);
+                planetDrawer.classList.remove('open');
+            });
+            row.querySelector('.planet-guide-mini').addEventListener('click', () => {
+                if (viewMode !== 'flight') setViewMode('flight');
+                setNavigationTarget(p.name, () => pObj.container.position.clone(), () => warpToPlanet(pObj, true));
+                planetDrawer.classList.remove('open');
+            });
+            planetNavList.appendChild(row);
+        });
+
+        document.getElementById('open-planets-btn').addEventListener('click', () => planetDrawer.classList.toggle('open'));
+        document.getElementById('planet-counter').addEventListener('click', () => planetDrawer.classList.toggle('open'));
+        document.getElementById('close-drawer').addEventListener('click', () => planetDrawer.classList.remove('open'));
+
+        document.getElementById('hud-info-btn').addEventListener('click', () => {
+            if (lockedPlanetObj) openPlanetModal(lockedPlanetObj.planetData);
+        });
+        document.getElementById('hud-return-btn').addEventListener('click', returnToCore);
+
+        const shapesPopover = document.getElementById('shapes-popover');
+        document.getElementById('toggle-shapes-btn').addEventListener('click', () => shapesPopover.classList.toggle('hidden'));
+
+        document.querySelectorAll('.shape-opt-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.shape-opt-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                if (lockedPlanetObj) returnToCore();
+                setShape(btn.dataset.shape);
+                shapesPopover.classList.add('hidden');
+            });
+        });
+
+        let wishCounter = 0;
+        let toastTimer = null;
+        const wishToast = document.getElementById('wish-toast');
+
+        function showToast(msg) {
+            wishToast.innerText = msg;
+            wishToast.classList.add('show');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => wishToast.classList.remove('show'), 3600);
+        }
+
+        document.getElementById('wish-btn').addEventListener('click', () => {
+            spawnShootingStar(true);
+            musicBox.playWishChime();
+            const msg = wishMessages[wishCounter % wishMessages.length];
+            wishCounter++;
+            showToast(msg);
+            logUserAction("dilek_tutuldu", msg);
+        });
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            document.getElementById('intro-screen').classList.add('fade-out');
+            musicBox.start();
+            document.getElementById('music-label').innerText = "Açık";
+            logUserAction("uzay_gemisine_binildi", "Giriş ekranı geçildi ve uçuş başladı");
+        });
+
+        document.getElementById('music-toggle').addEventListener('click', () => {
+            const active = musicBox.toggle();
+            document.getElementById('music-label').innerText = active ? "Açık" : "Sessiz";
+        });
+
+        let peaceStep = 0;
+        function showRandomGoldStar() {
+            const randomStar = goldStarMeshes[Math.floor(Math.random() * goldStarMeshes.length)];
+            openStarModal(randomStar.userData);
+        }
+        function showNextPeaceCrystal() {
+            const crystal = peaceCrystalMeshes[peaceStep % peaceCrystalMeshes.length];
+            peaceStep++;
+            openStarModal(crystal.userData);
+        }
+
+        document.getElementById('random-star-btn').addEventListener('click', showRandomGoldStar);
+        document.getElementById('next-reason-btn').addEventListener('click', showRandomGoldStar);
+        document.getElementById('next-peace-btn').addEventListener('click', showNextPeaceCrystal);
+        document.getElementById('star-counter').addEventListener('click', showRandomGoldStar);
+        document.getElementById('crystal-counter').addEventListener('click', showNextPeaceCrystal);
+
+        document.getElementById('close-reason').addEventListener('click', () => reasonModal.classList.add('hidden'));
+        document.getElementById('close-planet').addEventListener('click', () => planetModal.classList.add('hidden'));
+
+        document.getElementById('next-planet-btn').addEventListener('click', () => {
+            planetModal.classList.add('hidden');
+            const currentIdx = lockedPlanetObj
+                ? planetObjects.findIndex(p => p.planetData.id === lockedPlanetObj.planetData.id)
+                : -1;
+            const nextIdx = (currentIdx + 1) % planetObjects.length;
+            warpToPlanet(planetObjects[nextIdx], true);
+        });
+
+        document.getElementById('return-core-btn').addEventListener('click', () => {
+            planetModal.classList.add('hidden');
+            returnToCore();
+        });
+
+        document.getElementById('open-letter-btn').addEventListener('click', () => {
+            letterModal.classList.remove('hidden');
+            logUserAction("mektup_acildi", "Özür mektubu açıldı");
+        });
+        document.getElementById('close-letter').addEventListener('click', () => letterModal.classList.add('hidden'));
+
+        const btnCoy = document.getElementById('btn-coy');
+        const btnForgive = document.getElementById('btn-forgive');
+        const letterBody = document.getElementById('letter-body');
+        const forgiveBox = document.getElementById('forgive-box');
+
+        const coyMessages = [
+            "Haklısın sıçıp sıvadım ama valla çok pişmanım...",
+            "Bir daha bilmediğim kıyafete 'dediğim elbise' dersem ne olayım",
+            "Bir daha aynı hatalari yapıp sen haklı veya haksızken kalkip da seni düşünmek yerine sacma sapan tepkiler vermeyecegim söz veriyorum",
+            "Kurban olduğum hadi yumuşa biraz, çok özledim normal konuşmamızı",
+            "Tamam her şeyde %100 sen haklısın yavrum, hadi gül biraz"
+        ];
+        let coyStep = 0;
+
+        btnCoy.addEventListener('click', () => {
+            const msg = coyMessages[coyStep % coyMessages.length];
+            btnCoy.innerText = msg;
+            coyStep++;
+            btnForgive.style.transform = `scale(${1 + Math.min(coyStep * 0.06, 0.25)})`;
+            logUserAction("hala_kirginim_tiklandi", `Kırgınım butonu #${coyStep}: ${msg}`);
+        });
+
+        btnForgive.addEventListener('click', () => {
+            musicBox.playCelebrationChord();
+            returnToCore();
+            setShape('heart');
+            triggerSupernova();
+            logUserAction("baristik_tiklandi", "Tamam, barıştık 🤍 butonuna basıldı!");
+
+            letterBody.innerHTML = `
+                <div style="text-align:center; padding: 10px 0;">
+                    <h3 style="color: var(--text-main); font-family:'Lora', serif; font-weight:500; margin-top:0;">Kurban Olduğum Benim</h3>
+                    <p style="font-size: 1.15rem;">
+                        Kırgınlığını uzatmayıp beni affettiğin için teşekkür ederim yavrum.<br><br>
+                        Söz bir daha böyle saçma tepkilerle canını sıkmayacağım, seni her şeyden çok seviyorum. 🤍
+                    </p>
+                </div>
+            `;
+            forgiveBox.innerHTML = `<button class="btn-forgive" id="finish-celebration">Kapat</button>`;
+            document.getElementById('finish-celebration').addEventListener('click', () => {
+                letterModal.classList.add('hidden');
+            });
+        });
+
+        // ============================================================================
+        // 13. ANA ANİMASYON & FİZİK DÖNGÜSÜ
+        // ============================================================================
+        const clock = new THREE.Clock();
+        const worldUp = new THREE.Vector3(0, 1, 0);
+        const lookMat = new THREE.Matrix4();
+        const targetQuat = new THREE.Quaternion();
+        const projVec = new THREE.Vector3();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(clock.getDelta(), 0.05);
+            const elapsed = clock.getElapsedTime();
+
+            // 1. Merkez Morfoloji
+            const posAttr = morphGeo.attributes.position;
+            const heartBeat = 1 + Math.sin(elapsed * 3.4) * 0.04;
+            for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
+                posAttr.array[i] += (targetPos[i] * heartBeat - posAttr.array[i]) * 0.048;
+            }
+            posAttr.needsUpdate = true;
+            morphParticles.rotation.y = elapsed * 0.05;
+            deepSpaceGroup.rotation.y = elapsed * 0.004;
+
+            // 2. Taşlar & Yıldızlar
+            interactiveGroup.children.forEach((star, i) => {
+                if (star.userData.isPeaceStar) {
+                    star.rotation.y = elapsed * 1.2 + i;
+                    star.rotation.x = elapsed * 0.8;
+                }
+                if (star.children.length > 0) {
+                    const pulse = 1 + Math.sin(elapsed * 3.2 + i) * 0.24;
+                    star.children[0].scale.set(pulse, pulse, pulse);
+                }
+            });
+
+            // 3. Gezegenler
+            planetObjects.forEach((pObj, idx) => {
+                pObj.angle += pObj.planetData.speed * delta * 0.42;
+                const r = pObj.planetData.orbitRadius;
+                pObj.container.position.set(
+                    Math.cos(pObj.angle) * r,
+                    Math.sin(pObj.angle * 2 + idx) * 20,
+                    Math.sin(pObj.angle) * r
+                );
+                pObj.planetMesh.rotation.y += delta * 0.42;
+
+                pObj.moons.forEach(m => {
+                    const mAngle = elapsed * m.speed + m.phase;
+                    m.mesh.position.set(
+                        Math.cos(mAngle) * m.dist,
+                        Math.sin(mAngle * 1.5) * (pObj.planetData.size * 0.35),
+                        Math.sin(mAngle) * m.dist
+                    );
+                });
+            });
+
+            // 4. KAMERA & UÇUŞ MODU FİZİKLERİ
+            let desiredFov = 60;
+
+            if (warpAnim) {
+                // Otopilot Geçişi (Her iki modda da çalışır)
+                if (lockedPlanetObj) {
+                    const pPos = lockedPlanetObj.container.position;
+                    const dist = lockedPlanetObj.planetData.size * 4.4 + 26;
+                    warpAnim.targetLook.copy(pPos);
+                    warpAnim.targetCamPos.set(pPos.x + dist * 0.72, pPos.y + dist * 0.35, pPos.z + dist * 0.72);
+                }
+
+                camera.position.lerp(warpAnim.targetCamPos, 1 - Math.exp(-4.2 * delta));
+                lookMat.lookAt(camera.position, warpAnim.targetLook, worldUp);
+                targetQuat.setFromRotationMatrix(lookMat);
+                camera.quaternion.slerp(targetQuat, 1 - Math.exp(-5.0 * delta));
+                desiredFov = 68;
+
+                // Gemiyi kameranın önüne senkronize et
+                if (viewMode === 'flight') {
+                    const dirQuat = camera.quaternion;
+                    const ahead = new THREE.Vector3(0, -3.5, -15.5).applyQuaternion(dirQuat);
+                    shipState.pos.copy(camera.position).add(ahead);
+                    shipGroup.position.copy(shipState.pos);
+                    shipGroup.quaternion.copy(dirQuat);
+                }
+
+                if (camera.position.distanceTo(warpAnim.targetCamPos) < 3.5) {
+                    const cb = warpAnim.onArrive;
+                    if (viewMode === 'explore') {
+                        orbitControls.target.copy(warpAnim.targetLook);
+                    } else {
+                        const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+                        shipState.yaw = e.y;
+                        shipState.pitch = THREE.MathUtils.clamp(e.x, -1.25, 1.25);
+                        shipState.roll = 0;
+                    }
+                    warpAnim = null;
+                    if (cb) cb();
+                }
+            } else if (viewMode === 'explore') {
+                // SERBEST BAKIŞ MODU (OrbitControls - Döndür, Yakınlaştır/Büyüt)
+                if (lockedPlanetObj) {
+                    orbitControls.target.lerp(lockedPlanetObj.container.position, 0.12);
+                }
+                orbitControls.update();
+            } else {
+                // UÇUŞ MODU (Mobil Oyun Tarzı 3D Uzay Gemisi)
+                if (lockedPlanetObj) {
+                    // Gezegene varıldıktan sonra gemi gezegenin yanında süzülür
+                    const pPos = lockedPlanetObj.container.position;
+                    const dist = lockedPlanetObj.planetData.size * 4.4 + 26;
+                    const desiredCam = new THREE.Vector3(pPos.x + dist * 0.72, pPos.y + dist * 0.35, pPos.z + dist * 0.72);
+                    camera.position.lerp(desiredCam, 1 - Math.exp(-6 * delta));
+                    lookMat.lookAt(camera.position, pPos, worldUp);
+                    targetQuat.setFromRotationMatrix(lookMat);
+                    camera.quaternion.slerp(targetQuat, 1 - Math.exp(-6 * delta));
+
+                    const ahead = new THREE.Vector3(0, -3.5, -15.5).applyQuaternion(camera.quaternion);
+                    shipState.pos.copy(camera.position).add(ahead);
+                    shipGroup.position.copy(shipState.pos);
+                    shipGroup.quaternion.copy(camera.quaternion);
+                } else {
+                    // Serbest Pilotaj
+                    const turnInput = (shipState.turnKeyLeft ? 1 : 0) - (shipState.turnKeyRight ? 1 : 0) - shipState.joyX;
+                    const pitchInput = (shipState.pitchKeyUp ? 1 : 0) - (shipState.pitchKeyDown ? 1 : 0) - shipState.joyY;
+
+                    shipState.yaw += turnInput * delta * 1.55;
+                    shipState.pitch = THREE.MathUtils.clamp(shipState.pitch + pitchInput * delta * 1.2, -1.2, 1.2);
+
+                    // Kanat yatışı (bank roll)
+                    const targetRoll = THREE.MathUtils.clamp(turnInput * 0.45, -0.5, 0.5);
+                    shipState.roll += (targetRoll - shipState.roll) * (1 - Math.exp(-7 * delta));
+
+                    const boostMul = shipState.boost ? 2.1 : 1.0;
+                    const targetSpeed = shipState.throttle * 215 * boostMul;
+                    shipState.currentSpeed += (targetSpeed - shipState.currentSpeed) * (1 - Math.exp(-4.5 * delta));
+
+                    const dirQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(shipState.pitch, shipState.yaw, 0, 'YXZ'));
+                    const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(dirQuat);
+                    shipState.pos.addScaledVector(forwardDir, shipState.currentSpeed * delta);
+
+                    // Gemiyi yerleştir (dururken hafif nefes alan süzülme efekti)
+                    const hoverBob = Math.sin(elapsed * 2.2) * 0.14;
+                    shipGroup.position.copy(shipState.pos);
+                    shipGroup.position.y += hoverBob;
+                    shipGroup.quaternion.setFromEuler(new THREE.Euler(shipState.pitch, shipState.yaw, shipState.roll, 'YXZ'));
+
+                    // Üçüncü Şahıs Takip Kamerası (Chase Cam)
+                    const camOffset = new THREE.Vector3(0, 3.8, 15.5 + Math.abs(shipState.currentSpeed) * 0.015).applyQuaternion(dirQuat);
+                    const desiredCamPos = shipState.pos.clone().add(camOffset);
+                    camera.position.lerp(desiredCamPos, 1 - Math.exp(-8.5 * delta));
+
+                    const lookTarget = shipState.pos.clone().addScaledVector(forwardDir, 28);
+                    lookTarget.y += 0.9;
+                    camera.lookAt(lookTarget);
+
+                    desiredFov = 60 + Math.min(Math.abs(shipState.currentSpeed) / 220, 1) * 7.5;
+
+                    // Motor alevi & parlama
+                    const thrustVis = 0.25 + Math.min(Math.abs(shipState.currentSpeed) / 140, 1.4);
+                    flameL.scale.set(1, 1, thrustVis);
+                    flameR.scale.set(1, 1, thrustVis);
+                    haloSpriteL.material.opacity = 0.25 + thrustVis * 0.35;
+                    haloSpriteR.material.opacity = haloSpriteL.material.opacity;
+
+                    // Motor parçacık izi
+                    trailEmitAccum += delta * (Math.abs(shipState.currentSpeed) > 15 ? 45 : 8);
+                    if (trailEmitAccum >= 1) {
+                        trailEmitAccum = 0;
+                        const rear = new THREE.Vector3(0, 0, 2.8).applyQuaternion(shipGroup.quaternion).add(shipGroup.position);
+                        const i3 = trailCursor * 3;
+                        trailPositions[i3] = rear.x + (Math.random() - 0.5) * 0.5;
+                        trailPositions[i3 + 1] = rear.y + (Math.random() - 0.5) * 0.5;
+                        trailPositions[i3 + 2] = rear.z + (Math.random() - 0.5) * 0.5;
+                        trailCursor = (trailCursor + 1) % TRAIL_COUNT;
+                        trailGeo.attributes.position.needsUpdate = true;
+                    }
+                }
+            }
+
+            if (Math.abs(camera.fov - desiredFov) > 0.05) {
+                camera.fov += (desiredFov - camera.fov) * (1 - Math.exp(-6 * delta));
+                camera.updateProjectionMatrix();
+            }
+
+            // 5. Gemi Etrafındaki Uzay Tozunu Sar
+            const dustAttr = dustGeo.attributes.position;
+            const halfRange = DUST_RANGE * 0.5;
+            for (let i = 0; i < DUST_COUNT; i++) {
+                const i3 = i * 3;
+                let dx = dustAttr.array[i3] - camera.position.x;
+                let dy = dustAttr.array[i3 + 1] - camera.position.y;
+                let dz = dustAttr.array[i3 + 2] - camera.position.z;
+
+                if (dx > halfRange) dustAttr.array[i3] -= DUST_RANGE;
+                else if (dx < -halfRange) dustAttr.array[i3] += DUST_RANGE;
+                if (dy > halfRange) dustAttr.array[i3 + 1] -= DUST_RANGE;
+                else if (dy < -halfRange) dustAttr.array[i3 + 1] += DUST_RANGE;
+                if (dz > halfRange) dustAttr.array[i3 + 2] -= DUST_RANGE;
+                else if (dz < -halfRange) dustAttr.array[i3 + 2] += DUST_RANGE;
+            }
+            dustAttr.needsUpdate = true;
+
+            // 6. Gezegen 3D -> 2D Etiket Güncelleme
+            const hideLabels = anyModalOpen();
+            planetObjects.forEach(pObj => {
+                if (hideLabels) {
+                    pObj.floatEl.style.display = 'none';
+                    return;
+                }
+                const worldP = pObj.container.position;
+                const dist = Math.round(camera.position.distanceTo(worldP));
+                projVec.copy(worldP);
+                projVec.y += pObj.planetData.size + 8;
+                projVec.project(camera);
+
+                if (projVec.z < 1 && projVec.x > -0.92 && projVec.x < 0.92 && projVec.y > -0.85 && projVec.y < 0.85) {
+                    const sx = (projVec.x * 0.5 + 0.5) * window.innerWidth;
+                    const sy = (-projVec.y * 0.5 + 0.5) * window.innerHeight;
+                    pObj.floatEl.style.display = 'flex';
+                    pObj.floatEl.style.left = `${sx}px`;
+                    pObj.floatEl.style.top = `${sy}px`;
+                    pObj.floatEl.style.opacity = dist < 1100 ? '0.9' : '0.45';
+                    pObj.floatDistEl.innerText = `${dist}m`;
+                } else {
+                    pObj.floatEl.style.display = 'none';
+                }
+            });
+
+            // 7. Yön Rehberi Oku (Hedef seçiliyse veya çok uzaklaşıldıysa)
+            let activeGuide = navTarget;
+            if (!activeGuide && camera.position.length() > 950 && !lockedPlanetObj) {
+                activeGuide = { name: "Merkez Kalp", getPos: () => new THREE.Vector3(0, 0, 0), onWarp: returnToCore };
+                navGuidePill.style.display = 'flex';
+            }
+
+            if (activeGuide && !anyModalOpen()) {
+                const tPos = activeGuide.getPos();
+                const dist = Math.round(camera.position.distanceTo(tPos));
+                navGuideText.innerText = `${activeGuide.name} • ${dist}m`;
+
+                const localTarget = tPos.clone().applyMatrix4(camera.matrixWorldInverse);
+                const angleRad = Math.atan2(localTarget.x, -localTarget.z);
+                navGuideArrow.style.transform = `rotate(${(angleRad * 180 / Math.PI)}deg)`;
+            } else if (!navTarget) {
+                navGuidePill.style.display = 'none';
+            }
+
+            // 8. Yakınlık Bildirimi
+            let minDist = Infinity;
+            let foundTarget = null;
+            let foundLabel = "Merkez Kalp";
+
+            peaceCrystalMeshes.forEach(c => {
+                const d = camera.position.distanceTo(c.position);
+                if (d < minDist) {
+                    minDist = d;
+                    foundLabel = c.userData.title;
+                    if (d < 52) foundTarget = c.userData;
+                }
+            });
+
+            planetObjects.forEach(p => {
+                const d = camera.position.distanceTo(p.container.position);
+                if (d < minDist) {
+                    minDist = d;
+                    foundLabel = p.planetData.name;
+                }
+                if (d < p.planetData.size * 6.5 + 34) {
+                    foundTarget = p;
+                }
+            });
+
+            currentNearestLabel = foundLabel;
+            currentNearestTarget = foundTarget;
+
+            if (foundTarget && !anyModalOpen()) {
+                proximityPrompt.style.display = 'inline-flex';
+                const labelName = foundTarget.type === 'planet' ? foundTarget.planetData.name : foundTarget.title;
+                proximityPromptText.innerText = `${labelName} • Notu Oku`;
+            } else {
+                proximityPrompt.style.display = 'none';
+            }
+
+            if (Math.abs(shipState.currentSpeed) > 25 && elapsed - lastFlightLogTime > 8) {
+                lastFlightLogTime = elapsed;
+                logUserAction("gemide_hareket", `Uzay gemisi ile uçuluyor (${currentNearestLabel} yakınlarında)`);
+            }
+
+            // 9. Kayan Yıldızlar & Şok Dalgaları
+            if (Math.random() < 0.018) spawnShootingStar(false);
+
+            for (let i = shootingStars.length - 1; i >= 0; i--) {
+                const s = shootingStars[i];
+                s.pos.addScaledVector(s.dir, s.speed * delta);
+                s.life -= delta * 0.65;
+                const tail = s.pos.clone().sub(s.dir.clone().multiplyScalar(s.length));
+                s.line.geometry.setFromPoints([s.pos, tail]);
+                s.line.material.opacity = Math.max(0, s.life);
+                if (s.life <= 0) {
+                    scene.remove(s.line);
+                    s.line.geometry.dispose();
+                    s.line.material.dispose();
+                    shootingStars.splice(i, 1);
+                }
+            }
+
+            for (let i = shockwaves.length - 1; i >= 0; i--) {
+                const sw = shockwaves[i];
+                sw.scale += delta * 95;
+                sw.opacity -= delta * 0.42;
+                sw.mesh.scale.set(sw.scale, sw.scale, sw.scale);
+                sw.mesh.material.opacity = Math.max(0, sw.opacity);
+                if (sw.opacity <= 0) {
+                    scene.remove(sw.mesh);
+                    shockwaves.splice(i, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Başlat
+        initFirebaseConnection();
+        setThrottle(0);
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
+
